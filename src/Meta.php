@@ -12,12 +12,16 @@ final class Meta
         add_action('add_meta_boxes', [__CLASS__, 'add_metabox']);
         add_action('save_post_' . CPT::POST_TYPE, [__CLASS__, 'save'], 10, 2);
 
-        // Ensure uploads dir for our chooser
-        add_filter('upload_dir', [__CLASS__, 'filter_upload_dir']);
         // Allow extra mimes (images + office + pdf)
         add_filter('upload_mimes', [__CLASS__, 'extend_mimes']);
         // Enqueue media + our script for the field
         add_action('admin_enqueue_scripts', [__CLASS__, 'enqueue_media']);
+        // Hook into media upload process to redirect files to documents folder
+        add_filter('wp_handle_upload_prefilter', [__CLASS__, 'enable_upload_filter']);
+        add_filter('wp_handle_upload', [__CLASS__, 'disable_upload_filter']);
+        // Also handle sideloaded files
+        add_filter('wp_handle_sideload_prefilter', [__CLASS__, 'enable_upload_filter']);
+        add_filter('wp_handle_sideload', [__CLASS__, 'disable_upload_filter']);
     }
 
     public static function add_metabox(): void
@@ -113,12 +117,72 @@ final class Meta
         }
     }
 
-    /** Put our files in /uploads/documents (guarded) */
+    /** Enable upload directory filter only for our plugin uploads */
+    public static function enable_upload_filter($file)
+    {
+        // Check if we're in the context of our custom post type
+        if (self::is_our_upload_context()) {
+            add_filter('upload_dir', [__CLASS__, 'filter_upload_dir']);
+        }
+        return $file;
+    }
+
+    /** Disable upload directory filter after upload */
+    public static function disable_upload_filter($upload)
+    {
+        remove_filter('upload_dir', [__CLASS__, 'filter_upload_dir']);
+        return $upload;
+    }
+
+    /** Check if we're uploading for our post type */
+    private static function is_our_upload_context(): bool
+    {
+        // Check if we're on our post type's edit screen
+        global $pagenow;
+        if (($pagenow === 'post.php' || $pagenow === 'post-new.php')) {
+            $post_id = isset($_GET['post']) ? (int)$_GET['post'] : 0;
+            if ($post_id) {
+                return get_post_type($post_id) === CPT::POST_TYPE;
+            }
+            // For new posts, check the post_type parameter
+            if (isset($_GET['post_type']) && $_GET['post_type'] === CPT::POST_TYPE) {
+                return true;
+            }
+        }
+        
+        // Check for AJAX uploads from our post type
+        if (wp_doing_ajax()) {
+            // Check POST data for post_id
+            if (isset($_POST['post_id'])) {
+                $post_id = (int)$_POST['post_id'];
+                if ($post_id && get_post_type($post_id) === CPT::POST_TYPE) {
+                    return true;
+                }
+            }
+            // Check for media library uploads - look at referer
+            if (isset($_SERVER['HTTP_REFERER'])) {
+                $referer = $_SERVER['HTTP_REFERER'];
+                // Check if referer contains our post type
+                if (strpos($referer, 'post_type=' . CPT::POST_TYPE) !== false) {
+                    return true;
+                }
+                // Check if referer is editing our post type
+                if (preg_match('/post=(\d+)/', $referer, $matches)) {
+                    $post_id = (int)$matches[1];
+                    if (get_post_type($post_id) === CPT::POST_TYPE) {
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        return false;
+    }
+
+    /** Put our files in /uploads/documents */
     public static function filter_upload_dir(array $dirs): array
     {
-        // Keep base dirs, only swap subdir and url if present
-        $sub = '/documents';
-        $dirs['subdir'] = '/documents' . (isset($dirs['subdir']) && $dirs['subdir'] !== '' ? '' : '');
+        $dirs['subdir'] = '/documents';
         $dirs['path']   = trailingslashit($dirs['basedir']) . 'documents';
         $dirs['url']    = trailingslashit($dirs['baseurl']) . 'documents';
         return $dirs;

@@ -16,7 +16,7 @@ The plugin stores documents in `/wp-content/uploads/documents/` and provides a r
 
 **Namespace**: `WP_Easy\DocumentDownloader`
 
-**Custom Post Type**: `das_document` 
+**Custom Post Type**: `dd_document` 
 **Taxonomy**: `document_type`
 **Meta Key**: `_dd_file_id` (stores attachment ID)
 

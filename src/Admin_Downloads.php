@@ -27,10 +27,36 @@ final class Admin_Downloads
             [__CLASS__, 'render']
         );
 
-        // Stream CSV before admin page renders to avoid "headers already sent"
+        // Handle actions before admin page renders to avoid "headers already sent"
         if (self::$hook_suffix) {
             add_action('load-' . self::$hook_suffix, [__CLASS__, 'maybe_export']);
+            add_action('load-' . self::$hook_suffix, [__CLASS__, 'maybe_clear_log']);
         }
+    }
+
+    /**
+     * If 'das_clear=1' is present, clear the downloads table.
+     */
+    public static function maybe_clear_log(): void
+    {
+        if (! current_user_can('manage_options')) {
+            return;
+        }
+        if (empty($_GET['das_clear'])) {
+            return;
+        }
+        if (! isset($_GET['das_clear_nonce']) || ! wp_verify_nonce((string) $_GET['das_clear_nonce'], 'das_clear_log')) {
+            wp_die(__('Invalid clear request.', 'document-downloader'));
+        }
+
+        global $wpdb;
+        $table = REST_API::ensure_table();
+        $wpdb->query("TRUNCATE TABLE `{$table}`");
+
+        // Redirect back to avoid re-clearing on refresh
+        $redirect_url = remove_query_arg(['das_clear', 'das_clear_nonce']);
+        wp_redirect($redirect_url);
+        exit;
     }
 
     /**
@@ -102,6 +128,10 @@ final class Admin_Downloads
         $export_url = add_query_arg($query, $base_url);
         $export_url = wp_nonce_url($export_url, 'das_export_csv', 'das_export_nonce');
 
+        // Build clear log URL + nonce
+        $clear_url = add_query_arg(['page' => 'das_downloads', 'das_clear' => 1], $base_url);
+        $clear_url = wp_nonce_url($clear_url, 'das_clear_log', 'das_clear_nonce');
+
         // Reset URL (clear filters)
         $reset_url = remove_query_arg(['file_name','email','date_from','date_to'], $base_url);
 
@@ -161,6 +191,13 @@ final class Admin_Downloads
 
             <hr />
 
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div></div>
+                <button type="button" id="das-clear-log" class="button button-secondary" data-clear-url="<?php echo esc_url($clear_url); ?>" style="color: #b32d2e;">
+                    <?php esc_html_e('Clear Log', 'document-downloader'); ?>
+                </button>
+            </div>
+
             <table class="widefat striped">
                 <thead>
                     <tr>
@@ -194,6 +231,20 @@ final class Admin_Downloads
                 </tbody>
             </table>
         </div>
+
+        <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            $('#das-clear-log').on('click', function(e) {
+                e.preventDefault();
+                
+                var clearUrl = $(this).data('clear-url');
+                
+                if (confirm('<?php echo esc_js(__('Are you sure you want to clear all download logs? This action cannot be undone.', 'document-downloader')); ?>')) {
+                    window.location.href = clearUrl;
+                }
+            });
+        });
+        </script>
         <?php
     }
 
@@ -250,7 +301,7 @@ final class Admin_Downloads
         if ($where) {
             $sql .= ' WHERE ' . implode(' AND ', $where);
         }
-        $sql .= ' ORDER BY downloaded_at ASC';
+        $sql .= ' ORDER BY downloaded_at DESC';
 
         return [$sql, $args];
     }
