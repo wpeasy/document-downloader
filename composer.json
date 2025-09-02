@@ -1,0 +1,14 @@
+{
+    "name": "wpeasy/document-address-search",
+    "description": "CPT Document with PDF upload and AlpineJS title search.",
+    "type": "wordpress-plugin",
+    "require": {
+      "php": "^7.4 || ^8.0"
+    },
+    "autoload": {
+      "psr-4": {
+        "WP_Easy\\DocumentDownloader\\": "src/"
+      }
+    }
+  }
+  
