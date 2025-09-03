@@ -146,15 +146,41 @@ final class Shortcode
     <?php echo esc_html( sprintf( __('Search %s', 'document-downloader'), $plural_lc ) ); ?>
   </label>
 
-  <input
-    id="dd-search-input"
-    class="dd__input"
-    type="search"
-    placeholder="<?php esc_attr_e('Type at least 3 characters…', 'document-downloader'); ?>"
-    x-model="query"
-    @input="debouncedSearch()"
-    autocomplete="off"
-  />
+  <div class="dd__input-wrapper">
+    <input
+      id="dd-search-input"
+      class="dd__input"
+      type="search"
+      placeholder="<?php esc_attr_e('Type at least 3 characters…', 'document-downloader'); ?>"
+      x-model="query"
+      @input="debouncedSearch()"
+      autocomplete="off"
+    />
+    
+    <!-- Spinner icon while loading -->
+    <div class="dd__input-icon dd__input-icon--spinner" x-show="loading" x-cloak>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="32" stroke-dashoffset="32">
+          <animate attributeName="stroke-dasharray" dur="2s" values="0 32;16 16;0 32;0 32" repeatCount="indefinite"/>
+          <animate attributeName="stroke-dashoffset" dur="2s" values="0;-16;-32;-32" repeatCount="indefinite"/>
+        </circle>
+      </svg>
+    </div>
+    
+    <!-- Clear icon -->
+    <button 
+      type="button" 
+      class="dd__input-icon dd__input-icon--clear" 
+      x-show="query.length > 0 && !loading" 
+      @click="query = ''; results = [];"
+      :aria-label="<?php esc_attr_e('Clear search', 'document-downloader'); ?>"
+      x-cloak
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </button>
+  </div>
 
   <div class="dd__statuswrap" aria-live="polite" role="status">
     <template x-if="query.length > 0 && query.length < 3">
@@ -170,7 +196,7 @@ final class Shortcode
     </template>
   </div>
 
-  <ul class="dd__list" aria-title="Document List">
+  <ul class="dd__list" :class="{ 'dd__list--visible': results.length > 0 }" aria-title="Document List">
     <template x-for="item in results" :key="item.id">
       <li class="dd__item">
         <button

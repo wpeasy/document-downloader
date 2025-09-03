@@ -249,17 +249,30 @@ final class REST_API
         }
         
         $to = $opts['notification_email'];
-        $subject = sprintf(__('Document Download: %s', 'document-downloader'), $filename);
         
-        $message = sprintf(
-            __('A document has been downloaded:\n\nDocument: %s\nFile: %s\nDownloaded by: %s\nURL: %s\nDate: %s', 'document-downloader'),
-            $title ?: $filename,
-            $filename,
-            $email,
-            $url ?: 'N/A',
-            current_time('Y-m-d H:i:s')
-        );
+        // Prepare placeholders
+        $placeholders = [
+            '{file_name}' => $filename,
+            '{title}'     => $title ?: $filename,
+            '{email}'     => $email,
+            '{date}'      => current_time('F j, Y g:i A'),
+            '{url}'       => $url ?: 'N/A',
+            '{ip}'        => $_SERVER['REMOTE_ADDR'] ?? 'Unknown',
+        ];
+        
+        // Replace placeholders in subject and message
+        $subject = str_replace(array_keys($placeholders), array_values($placeholders), $opts['notification_subject']);
+        $message = str_replace(array_keys($placeholders), array_values($placeholders), $opts['notification_message']);
+        
+        // Apply wpautop to format paragraphs and line breaks properly
+        $message = wpautop($message);
+        
+        // Set content type to HTML
+        add_filter('wp_mail_content_type', function() { return 'text/html'; });
         
         wp_mail($to, $subject, $message);
+        
+        // Reset content type
+        remove_filter('wp_mail_content_type', function() { return 'text/html'; });
     }
 }

@@ -24,8 +24,23 @@ final class Settings
             'require_email'       => 0,
             'notify_email'        => 0,
             'notification_email'  => '',
+            'notification_subject' => '{file_name} downloaded',
+            'notification_message' => self::default_notification_message(),
             'frontend_css'        => self::default_css(),
         ];
+    }
+
+    /** Default notification message HTML */
+    private static function default_notification_message(): string
+    {
+        return <<<HTML
+<h2>Document Downloaded</h2>
+<p>A document has been downloaded from your website.</p>
+<p><strong>Document:</strong> {file_name}</p>
+<p><strong>Downloaded by:</strong> {email}</p>
+<p><strong>Date:</strong> {date}</p>
+<p><strong>URL:</strong> {url}</p>
+HTML;
     }
 
     /** Default frontend CSS (BEM `.dd__*`) */
@@ -39,17 +54,68 @@ final class Settings
     --dd-status-lh: 1.25;
     max-width: 640px;
     margin: 0;
+    position: relative;
   }
 
   .dd__label { display:block; margin-bottom:.25rem; font-weight:600; }
 
+  .dd__input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
   .dd__input {
     width:100%;
-    padding:.5rem .75rem;
+    padding:.5rem 2.5rem .5rem .75rem;
     border:1px solid #ccc;
     border-radius:6px;
+    position: relative;
+    z-index: 1;
+    background: white;
   }
   .dd__input:focus { outline:none; border-color:#999; }
+  
+  /* Remove default search input styling that might interfere */
+  .dd__input[type="search"]::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    display: none;
+  }
+  
+  .dd__input-icon {
+    position: absolute;
+    right: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666;
+    pointer-events: none;
+    z-index: 2;
+  }
+  
+  .dd__input-icon--clear {
+    pointer-events: auto;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px;
+    border-radius: 3px;
+    color: #999;
+  }
+  
+  .dd__input-icon--clear:hover {
+    background: #f0f0f0;
+    color: #666;
+  }
+  
+  .dd__input-icon--spinner {
+    color: #0073aa;
+  }
+  
+  .dd__input-icon svg {
+    width: 16px;
+    height: 16px;
+  }
 
   /* Fixed-height status to avoid layout shift */
   .dd__statuswrap {
@@ -61,7 +127,35 @@ final class Settings
 
   .dd__status { margin:0; font-style:italic; opacity:.85; }
 
-  .dd__list { list-style:none; padding:0; margin:.75rem 0 0 0; }
+  .dd__list { 
+    position: absolute; 
+    list-style: none; 
+    padding: 1rem; 
+    margin: 0; 
+    background: white; 
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15); 
+    max-height: 400px; 
+    overflow-y: auto; 
+    width: 100%; 
+    z-index: 1000;
+    border-radius: 6px;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+    visibility: hidden;
+  }
+  
+  .dd__list.dd__list--visible {
+    opacity: 1;
+    transform: translateY(0);
+    visibility: visible;
+  }
+  
+  /* Custom scrollbar styling */
+  .dd__list::-webkit-scrollbar { width: 8px; }
+  .dd__list::-webkit-scrollbar-track { background: #f1f1f1; }
+  .dd__list::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
+  .dd__list::-webkit-scrollbar-thumb:hover { background: #555; }
   .dd__item { margin:0 0 .5rem 0; }
 
   .dd__button {
@@ -116,6 +210,8 @@ CSS;
             'require_email'       => (int)!empty($opt['require_email']),
             'notify_email'        => (int)!empty($opt['notify_email']),
             'notification_email'  => sanitize_email((string)$opt['notification_email']),
+            'notification_subject' => trim((string)$opt['notification_subject']),
+            'notification_message' => (string)$opt['notification_message'],
             'frontend_css'        => (string)$opt['frontend_css'],
         ];
         if ($out['plural'] === '')   $out['plural']   = 'Documents';
@@ -170,10 +266,13 @@ CSS;
             'require_email'       => !empty($value['require_email']) ? 1 : 0,
             'notify_email'        => !empty($value['notify_email']) ? 1 : 0,
             'notification_email'  => isset($value['notification_email']) ? sanitize_email($value['notification_email']) : '',
+            'notification_subject' => isset($value['notification_subject']) ? sanitize_text_field($value['notification_subject']) : $d['notification_subject'],
+            'notification_message' => isset($value['notification_message']) ? wp_kses_post($value['notification_message']) : $d['notification_message'],
             'frontend_css'        => isset($value['frontend_css']) ? preg_replace("/^\xEF\xBB\xBF/", '', (string)$value['frontend_css']) : $d['frontend_css'],
         ];
         if ($out['plural'] === '')   $out['plural']   = $d['plural'];
         if ($out['singular'] === '') $out['singular'] = $d['singular'];
+        if ($out['notification_subject'] === '') $out['notification_subject'] = $d['notification_subject'];
         return $out;
     }
 
@@ -229,6 +328,7 @@ CSS;
 
                 <h2 class="nav-tab-wrapper" id="dd-tabs" role="tablist" style="margin-bottom:.75rem;">
                     <a href="#settings" class="nav-tab nav-tab-active" role="tab" aria-selected="true" data-tab="settings"><?php esc_html_e('Settings', 'document-downloader'); ?></a>
+                    <a href="#notifications" class="nav-tab" role="tab" aria-selected="false" data-tab="notifications"><?php esc_html_e('Notifications', 'document-downloader'); ?></a>
                     <a href="#style" class="nav-tab" role="tab" aria-selected="false" data-tab="style"><?php esc_html_e('Style', 'document-downloader'); ?></a>
                 </h2>
 
@@ -252,6 +352,13 @@ CSS;
                                     <th scope="row"><?php esc_html_e('Require email for download', 'document-downloader'); ?></th>
                                     <td><?php self::field_checkbox('require_email', (int)$opt['require_email'], __('Require users to enter an email address before downloading.', 'document-downloader')); ?></td>
                                 </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div id="dd-tab-notifications" class="dd-tabpane" role="tabpanel" style="display:none;">
+                        <table class="form-table" role="presentation">
+                            <tbody>
                                 <tr>
                                     <th scope="row"><?php esc_html_e('Notify by email', 'document-downloader'); ?></th>
                                     <td><?php self::field_checkbox('notify_email', (int)$opt['notify_email'], __('Send email notification when documents are downloaded.', 'document-downloader')); ?></td>
@@ -262,6 +369,51 @@ CSS;
                                 </tr>
                             </tbody>
                         </table>
+                        
+                        <div id="dd-notification-fields" <?php echo $opt['notify_email'] ? '' : 'style="display:none"'; ?>>
+                            <hr style="margin: 20px 0;">
+                            
+                            <h3><?php esc_html_e('Email Template', 'document-downloader'); ?></h3>
+                            
+                            <div style="background: #f9f9f9; padding: 15px; margin: 15px 0; border-radius: 4px;">
+                                <h4 style="margin-top: 0;"><?php esc_html_e('Available Placeholders (click to copy):', 'document-downloader'); ?></h4>
+                                <div id="dd-placeholders">
+                                    <span class="dd-placeholder" data-placeholder="{file_name}">{file_name}</span>
+                                    <span class="dd-placeholder" data-placeholder="{title}">{title}</span>
+                                    <span class="dd-placeholder" data-placeholder="{email}">{email}</span>
+                                    <span class="dd-placeholder" data-placeholder="{date}">{date}</span>
+                                    <span class="dd-placeholder" data-placeholder="{url}">{url}</span>
+                                    <span class="dd-placeholder" data-placeholder="{ip}">{ip}</span>
+                                </div>
+                            </div>
+                            
+                            <table class="form-table" role="presentation">
+                                <tbody>
+                                    <tr>
+                                        <th scope="row"><label for="dd-notification-subject"><?php esc_html_e('Email Subject', 'document-downloader'); ?></label></th>
+                                        <td><?php self::field_text('notification_subject', $opt['notification_subject'], '{file_name} downloaded', 'id="dd-notification-subject" class="large-text"'); ?></td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row"><label for="dd-notification-message"><?php esc_html_e('Email Message', 'document-downloader'); ?></label></th>
+                                        <td>
+                                            <?php 
+                                            wp_editor($opt['notification_message'], 'dd-notification-message', [
+                                                'textarea_name' => self::OPTION . '[notification_message]',
+                                                'textarea_rows' => 10,
+                                                'media_buttons' => false,
+                                                'teeny' => true,
+                                                'tinymce' => [
+                                                    'toolbar1' => 'formatselect,bold,italic,underline,bullist,numlist,blockquote,link,unlink',
+                                                    'toolbar2' => '',
+                                                ],
+                                            ]);
+                                            ?>
+                                            <p class="description"><?php esc_html_e('Use the placeholders above to customize your notification email. HTML is supported.', 'document-downloader'); ?></p>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
 
                     <div id="dd-tab-style" class="dd-tabpane" role="tabpanel" style="display:none;">
@@ -283,13 +435,36 @@ CSS;
             </form>
         </div>
 
-        <style>#dd-frontend-css{min-height:70vh;height:70vh;}</style>
+        <style>
+        #dd-frontend-css{min-height:70vh;height:70vh;}
+        .dd-placeholder {
+            display: inline-block;
+            background: #0073aa;
+            color: white;
+            padding: 4px 8px;
+            margin: 2px 4px 2px 0;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: monospace;
+        }
+        .dd-placeholder:hover {
+            background: #005a87;
+        }
+        #dd-placeholders {
+            line-height: 1.8;
+        }
+        </style>
 
         <script type="module">
         (async () => {
           // Tabs
           const tabs = document.querySelectorAll('#dd-tabs .nav-tab');
-          const panes = { settings: document.getElementById('dd-tab-settings'), style: document.getElementById('dd-tab-style') };
+          const panes = { 
+            settings: document.getElementById('dd-tab-settings'), 
+            notifications: document.getElementById('dd-tab-notifications'),
+            style: document.getElementById('dd-tab-style') 
+          };
           const selectTab = (k) => {
             tabs.forEach(t => { const a = t.dataset.tab === k; t.classList.toggle('nav-tab-active', a); t.setAttribute('aria-selected', a ? 'true' : 'false'); });
             for (const key in panes) panes[key].style.display = (key === k) ? 'block' : 'none';
@@ -297,14 +472,47 @@ CSS;
           };
           tabs.forEach(t => t.addEventListener('click', e => { e.preventDefault(); selectTab(t.dataset.tab); }));
           let initial = 'settings';
-          try { const ls = localStorage.getItem('ddSettingsTab'); if (ls === 'style' || ls === 'settings') initial = ls; } catch(e){}
-          if (location.hash === '#style') initial = 'style';
+          try { const ls = localStorage.getItem('ddSettingsTab'); if (['settings', 'notifications', 'style'].includes(ls)) initial = ls; } catch(e){}
+          if (location.hash === '#notifications') initial = 'notifications';
+          else if (location.hash === '#style') initial = 'style';
           selectTab(initial);
 
-          // Toggle notification email row
+          // Toggle notification email row and fields
           const notify = document.querySelector('input[name="<?php echo esc_js(self::OPTION); ?>[notify_email]"]');
           const row = document.getElementById('dd-notify-row');
-          if (notify && row) notify.addEventListener('change', () => { row.style.display = notify.checked ? '' : 'none'; });
+          const fields = document.getElementById('dd-notification-fields');
+          if (notify && row) {
+            notify.addEventListener('change', () => { 
+              const display = notify.checked ? '' : 'none';
+              row.style.display = display;
+              if (fields) fields.style.display = display;
+            });
+          }
+          
+          // Placeholder click to copy functionality
+          document.querySelectorAll('.dd-placeholder').forEach(placeholder => {
+            placeholder.addEventListener('click', function() {
+              const text = this.dataset.placeholder;
+              
+              // Copy to clipboard
+              if (navigator.clipboard) {
+                navigator.clipboard.writeText(text);
+              } else {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+              }
+              
+              // Visual feedback
+              const original = this.textContent;
+              this.textContent = 'Copied!';
+              setTimeout(() => { this.textContent = original; }, 1000);
+            });
+          });
 
           // CM6 (via esm.sh)
           const ta   = document.getElementById('dd-frontend-css');
