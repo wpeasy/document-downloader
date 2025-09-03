@@ -136,6 +136,11 @@ final class REST_API
 
         if ($s === '' || mb_strlen($s) < 3) return new WP_REST_Response([], 200);
         if (mb_strlen($s) > 100)        return new WP_REST_Response(['error' => 'too_long'], 400);
+        
+        // Check if search query matches excluded terms
+        if (self::is_search_query_excluded($s)) {
+            return new WP_REST_Response([], 200);
+        }
 
         $args = [
             'post_type'       => CPT::POST_TYPE,
@@ -274,5 +279,57 @@ final class REST_API
         
         // Reset content type
         remove_filter('wp_mail_content_type', function() { return 'text/html'; });
+    }
+
+    /**
+     * Check if the search query matches any excluded terms
+     */
+    private static function is_search_query_excluded(string $query): bool
+    {
+        $opts = Settings::get_options();
+        $excluded_text = trim($opts['excluded_search_text']);
+        
+        if ($excluded_text === '') {
+            return false;
+        }
+        
+        // Parse comma-delimited exclusion terms
+        $exclusions = array_map('trim', explode(',', $excluded_text));
+        $exclusions = array_filter($exclusions, function($term) { return $term !== ''; });
+        
+        if (empty($exclusions)) {
+            return false;
+        }
+        
+        $query_lower = strtolower($query);
+        
+        foreach ($exclusions as $exclusion) {
+            $pattern = strtolower(trim($exclusion));
+            if ($pattern === '') continue;
+            
+            if (self::query_matches_exclusion_pattern($query_lower, $pattern)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Check if query matches an exclusion pattern
+     */
+    private static function query_matches_exclusion_pattern(string $query, string $pattern): bool
+    {
+        // No wildcards - whole word match only
+        if (strpos($pattern, '*') === false) {
+            // Split query into words and check for exact word match
+            $words = preg_split('/\s+/', $query);
+            return in_array($pattern, $words, true);
+        }
+        
+        // Has wildcards - convert to regex and match entire query
+        $regex = '/^' . str_replace('\\*', '.*', preg_quote($pattern, '/')) . '$/';
+        
+        return preg_match($regex, $query) === 1;
     }
 }

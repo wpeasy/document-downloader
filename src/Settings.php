@@ -26,6 +26,7 @@ final class Settings
             'notification_email'  => '',
             'notification_subject' => '{file_name} downloaded',
             'notification_message' => self::default_notification_message(),
+            'excluded_search_text' => '',
             'frontend_css'        => self::default_css(),
         ];
     }
@@ -126,6 +127,7 @@ HTML;
   }
 
   .dd__status { margin:0; font-style:italic; opacity:.85; }
+  .dd__status--error { color: #d63638; font-weight: 500; }
 
   .dd__list { 
     position: absolute; 
@@ -212,6 +214,7 @@ CSS;
             'notification_email'  => sanitize_email((string)$opt['notification_email']),
             'notification_subject' => trim((string)$opt['notification_subject']),
             'notification_message' => (string)$opt['notification_message'],
+            'excluded_search_text' => trim((string)$opt['excluded_search_text']),
             'frontend_css'        => (string)$opt['frontend_css'],
         ];
         if ($out['plural'] === '')   $out['plural']   = 'Documents';
@@ -268,6 +271,7 @@ CSS;
             'notification_email'  => isset($value['notification_email']) ? sanitize_email($value['notification_email']) : '',
             'notification_subject' => isset($value['notification_subject']) ? sanitize_text_field($value['notification_subject']) : $d['notification_subject'],
             'notification_message' => isset($value['notification_message']) ? wp_kses_post($value['notification_message']) : $d['notification_message'],
+            'excluded_search_text' => isset($value['excluded_search_text']) ? sanitize_textarea_field($value['excluded_search_text']) : $d['excluded_search_text'],
             'frontend_css'        => isset($value['frontend_css']) ? preg_replace("/^\xEF\xBB\xBF/", '', (string)$value['frontend_css']) : $d['frontend_css'],
         ];
         if ($out['plural'] === '')   $out['plural']   = $d['plural'];
@@ -351,6 +355,13 @@ CSS;
                                 <tr>
                                     <th scope="row"><?php esc_html_e('Require email for download', 'document-downloader'); ?></th>
                                     <td><?php self::field_checkbox('require_email', (int)$opt['require_email'], __('Require users to enter an email address before downloading.', 'document-downloader')); ?></td>
+                                </tr>
+                                <tr>
+                                    <th scope="row"><label for="dd-excluded-text"><?php esc_html_e('Excluded Search Text', 'document-downloader'); ?></label></th>
+                                    <td>
+                                        <?php self::field_text('excluded_search_text', $opt['excluded_search_text'], 'pdf, .docx, *temp*, draft*', 'id="dd-excluded-text" class="large-text"'); ?>
+                                        <p class="description"><?php esc_html_e('Comma-separated list of search terms to block. If someone searches for these terms, they get no results. Use * as wildcard (e.g., "pdf, .docx, *temp*, draft*"). Without wildcards, matches whole words only.', 'document-downloader'); ?></p>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>

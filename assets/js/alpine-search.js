@@ -11,6 +11,7 @@
     query: '',
     results: [],
     loading: false,
+    error: false,
 
     // Download workflow state
     requireEmail: !!(window.DDOptions && DDOptions.requireEmail),
@@ -46,6 +47,7 @@
       if (q.length < 3) {
         this.results = [];
         this.loading = false;
+        this.error = false;
         if (this._abortController) {
           this._abortController.abort();
           this._abortController = null;
@@ -59,6 +61,7 @@
       this._abortController = new AbortController();
 
       this.loading = true;
+      this.error = false;
 
       try {
         const headers = {
@@ -86,13 +89,18 @@
 
         if (!res.ok) {
           this.results = [];
+          this.error = true;
           return;
         }
 
         const data = await res.json();
         this.results = Array.isArray(data) ? data : [];
+        this.error = false;
       } catch (err) {
-        if (!err || err.name !== 'AbortError') this.results = [];
+        if (!err || err.name !== 'AbortError') {
+          this.results = [];
+          this.error = true;
+        }
       } finally {
         this.loading = false;
       }

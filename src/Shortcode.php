@@ -173,7 +173,7 @@ final class Shortcode
       class="dd__input-icon dd__input-icon--clear" 
       x-show="query.length > 0 && !loading" 
       @click="query = ''; results = [];"
-      :aria-label="<?php esc_attr_e('Clear search', 'document-downloader'); ?>"
+      :aria-label="'<?php esc_attr_e('Clear search', 'document-downloader'); ?>'"
       x-cloak
     >
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -191,7 +191,11 @@ final class Shortcode
       <p class="dd__status dd__status--loading"><?php esc_html_e('Searching…', 'document-downloader'); ?></p>
     </template>
 
-    <template x-if="!loading && results.length === 0 && query.length >= 3">
+    <template x-if="error">
+      <p class="dd__status dd__status--error"><?php esc_html_e('Error: check internet connection', 'document-downloader'); ?></p>
+    </template>
+
+    <template x-if="!loading && !error && results.length === 0 && query.length >= 3">
       <p class="dd__status dd__status--empty"><?php esc_html_e('No matching documents.', 'document-downloader'); ?></p>
     </template>
   </div>
