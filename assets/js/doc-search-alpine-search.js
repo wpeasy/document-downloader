@@ -10,8 +10,21 @@
 
     query: '',
     results: [],
+    currentPageResults: [],
     loading: false,
     error: false,
+
+    // Pagination state
+    pagination: {
+      enabled: false,
+      currentPage: 0,
+      rowsPerPage: 50,
+      pageCount: 10,
+      showPagination: true,
+      totalPages: 0,
+      totalItems: 0,
+      visiblePages: []
+    },
 
     // Download workflow state
     requireEmail: !!(window.DocSearchOptions && DocSearchOptions.requireEmail),
@@ -35,7 +48,7 @@
     _debounceTimer: null,
     _abortController: null,
 
-    // Read JSON array from data-dd-tax attribute
+    // Read JSON data from data attributes
     initFromData(el) {
       try {
         const raw = el?.dataset?.docSearchTax ?? '[]';
@@ -43,6 +56,20 @@
         if (Array.isArray(parsed)) this.tax = parsed;
       } catch (e) {
         this.tax = [];
+      }
+
+      // Initialize pagination from data attribute
+      try {
+        const paginationRaw = el?.dataset?.docSearchPagination ?? '{}';
+        const paginationData = JSON.parse(paginationRaw);
+        if (paginationData && typeof paginationData === 'object') {
+          this.pagination.enabled = !!paginationData.enabled;
+          this.pagination.rowsPerPage = Math.max(1, parseInt(paginationData.rowsPerPage) || 50);
+          this.pagination.pageCount = Math.max(1, parseInt(paginationData.pageCount) || 10);
+          this.pagination.showPagination = paginationData.showPagination !== false;
+        }
+      } catch (e) {
+        // Keep defaults
       }
     },
 
@@ -56,8 +83,15 @@
 
       if (q.length < 3) {
         this.results = [];
+        this.currentPageResults = [];
         this.loading = false;
         this.error = false;
+        
+        // Reset pagination when clearing search
+        this.pagination.totalPages = 0;
+        this.pagination.totalItems = 0;
+        this.pagination.currentPage = 0;
+        this.pagination.visiblePages = [];
         if (this._abortController) {
           this._abortController.abort();
           this._abortController = null;
@@ -106,14 +140,81 @@
         const data = await res.json();
         this.results = Array.isArray(data) ? data : [];
         this.error = false;
+        
+        // Update pagination after search
+        this.updatePagination();
       } catch (err) {
         if (!err || err.name !== 'AbortError') {
           this.results = [];
+          this.currentPageResults = [];
           this.error = true;
         }
       } finally {
         this.loading = false;
       }
+    },
+
+    // Pagination methods
+    updatePagination() {
+      if (!this.pagination.enabled) {
+        this.currentPageResults = this.results;
+        return;
+      }
+
+      this.pagination.totalItems = this.results.length;
+      this.pagination.totalPages = Math.ceil(this.pagination.totalItems / this.pagination.rowsPerPage);
+      
+      // Reset to first page if current page is out of bounds
+      if (this.pagination.currentPage >= this.pagination.totalPages) {
+        this.pagination.currentPage = Math.max(0, this.pagination.totalPages - 1);
+      }
+      
+      // Calculate visible page numbers
+      this.calculateVisiblePages();
+      
+      // Get current page results
+      this.updateCurrentPageResults();
+    },
+
+    calculateVisiblePages() {
+      const totalPages = this.pagination.totalPages;
+      const currentPage = this.pagination.currentPage;
+      const pageCount = this.pagination.pageCount;
+      
+      if (totalPages <= pageCount) {
+        // Show all pages if total is less than or equal to pageCount
+        this.pagination.visiblePages = Array.from({length: totalPages}, (_, i) => i + 1);
+      } else {
+        // Calculate range around current page
+        const halfCount = Math.floor(pageCount / 2);
+        let startPage = Math.max(1, (currentPage + 1) - halfCount);
+        let endPage = Math.min(totalPages, startPage + pageCount - 1);
+        
+        // Adjust if we're near the end
+        if (endPage - startPage + 1 < pageCount) {
+          startPage = Math.max(1, endPage - pageCount + 1);
+        }
+        
+        this.pagination.visiblePages = Array.from({length: endPage - startPage + 1}, (_, i) => startPage + i);
+      }
+    },
+
+    updateCurrentPageResults() {
+      if (!this.pagination.enabled) {
+        this.currentPageResults = this.results;
+        return;
+      }
+
+      const start = this.pagination.currentPage * this.pagination.rowsPerPage;
+      const end = start + this.pagination.rowsPerPage;
+      this.currentPageResults = this.results.slice(start, end);
+    },
+
+    goToPage(pageIndex) {
+      if (pageIndex < 0 || pageIndex >= this.pagination.totalPages) return;
+      this.pagination.currentPage = pageIndex;
+      this.updateCurrentPageResults();
+      this.calculateVisiblePages();
     },
 
     onItemClick(item) {

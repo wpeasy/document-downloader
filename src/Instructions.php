@@ -53,6 +53,41 @@ final class Instructions
                     <li><?php esc_html_e('Look at the "Slug" field - this is what you use in the tax parameter', 'document-downloader'); ?></li>
                     <li><?php esc_html_e('For multiple types, separate them with commas: tax="type1,type2,type3"', 'document-downloader'); ?></li>
                 </ol>
+                
+                <h3><?php esc_html_e('Pagination Options', 'document-downloader'); ?></h3>
+                <p><?php esc_html_e('Both shortcodes support pagination to handle large document lists:', 'document-downloader'); ?></p>
+                
+                <h4><?php esc_html_e('Pagination Parameters', 'document-downloader'); ?></h4>
+                <ul>
+                    <li><strong>id:</strong> <?php esc_html_e('Unique identifier for the shortcode (used for external pagination)', 'document-downloader'); ?></li>
+                    <li><strong>paginate:</strong> <?php esc_html_e('Enable/disable pagination (default: false)', 'document-downloader'); ?></li>
+                    <li><strong>rows_per_page:</strong> <?php esc_html_e('Documents per page (default: 50)', 'document-downloader'); ?></li>
+                    <li><strong>page_count:</strong> <?php esc_html_e('Number of page links to show (default: 10)', 'document-downloader'); ?></li>
+                    <li><strong>show_pagination:</strong> <?php esc_html_e('Show automatic pagination controls (default: true)', 'document-downloader'); ?></li>
+                </ul>
+                
+                <h4><?php esc_html_e('Pagination Examples', 'document-downloader'); ?></h4>
+                
+                <h5><?php esc_html_e('Document List Examples', 'document-downloader'); ?></h5>
+                <code>[wpe_document_list paginate="true" rows_per_page="20"]</code><br>
+                <p class="description"><?php esc_html_e('Shows 20 documents per page with automatic pagination controls', 'document-downloader'); ?></p>
+                
+                <code>[wpe_document_list id="my-list" paginate="true" page_count="5" show_pagination="false"]</code><br>
+                <p class="description"><?php esc_html_e('Enables pagination but hides automatic controls (for custom pagination placement)', 'document-downloader'); ?></p>
+                
+                <h5><?php esc_html_e('Document Search Examples', 'document-downloader'); ?></h5>
+                <code>[wpe_document_search paginate="true" rows_per_page="10" show_pagination="true"]</code><br>
+                <p class="description"><?php esc_html_e('Shows 10 search results per page with pagination controls', 'document-downloader'); ?></p>
+                
+                <code>[wpe_document_search id="my-search" paginate="true" page_count="5" show_pagination="false"]</code><br>
+                <p class="description"><?php esc_html_e('Enables search pagination but hides automatic controls (for custom pagination placement)', 'document-downloader'); ?></p>
+                
+                <h3><?php esc_html_e('Custom Pagination Placement', 'document-downloader'); ?></h3>
+                <p><?php esc_html_e('You can place pagination controls anywhere using the pagination shortcode:', 'document-downloader'); ?></p>
+                <code>[wpe_document_pagination target_id="my-search"]</code>
+                <p class="description"><?php esc_html_e('Creates pagination controls that link to the shortcode with id="my-search"', 'document-downloader'); ?></p>
+                
+                <p><?php esc_html_e('This allows you to place pagination above the list, in sidebars, or anywhere else on the page.', 'document-downloader'); ?></p>
             </div>
 
             <div class="card">

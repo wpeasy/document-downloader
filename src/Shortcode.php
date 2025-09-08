@@ -9,6 +9,7 @@ final class Shortcode
     {
         add_shortcode('wpe_document_search', [__CLASS__, 'render_search']);
         add_shortcode('wpe_document_list', [__CLASS__, 'render_list']);
+        add_shortcode('wpe_document_pagination', [__CLASS__, 'render_pagination']);
         add_action('wp_enqueue_scripts', [__CLASS__, 'assets']);
     }
 
@@ -156,21 +157,47 @@ final class Shortcode
         $plural    = $labels['plural'] ?? 'Documents';
         $plural_lc = function_exists('mb_strtolower') ? mb_strtolower($plural) : strtolower($plural);
 
-        // Shortcode attr + GET param (?tax=slug-a,slug-b) -> slug array
-        $atts = shortcode_atts(['tax' => ''], $atts, 'wpe_document_search');
+        // Shortcode attributes with defaults
+        $atts = shortcode_atts([
+            'tax' => '',
+            'id' => '',
+            'paginate' => 'false',
+            'rows_per_page' => '50',
+            'page_count' => '10',
+            'show_pagination' => 'true'
+        ], $atts, 'wpe_document_search');
         $get_tax = isset($_GET['tax']) ? sanitize_text_field(wp_unslash($_GET['tax'])) : '';
         $tax_str = trim($atts['tax'] ?: $get_tax);
         $tax_slugs = array_values(array_filter(array_map('sanitize_title', preg_split('/\s*,\s*/', $tax_str, -1, PREG_SPLIT_NO_EMPTY))));
 
+        // Generate unique ID if not provided
+        $unique_id = !empty($atts['id']) ? sanitize_html_class($atts['id']) : 'doc-search-' . wp_rand(1000, 9999);
+        
+        // Parse pagination attributes
+        $paginate = filter_var($atts['paginate'], FILTER_VALIDATE_BOOLEAN);
+        $rows_per_page = max(1, intval($atts['rows_per_page']));
+        $page_count = max(1, intval($atts['page_count']));
+        $show_pagination = filter_var($atts['show_pagination'], FILTER_VALIDATE_BOOLEAN);
+        
         // Pass tax slugs via data-attribute (safe JSON for HTML attr)
         $tax_json_attr = esc_attr(wp_json_encode($tax_slugs));
+        
+        // Pass pagination config to JavaScript
+        $pagination_config = esc_attr(wp_json_encode([
+            'enabled' => $paginate,
+            'rowsPerPage' => $rows_per_page,
+            'pageCount' => $page_count,
+            'showPagination' => $show_pagination
+        ]));
 
         ob_start(); ?>
 <div
+  id="<?php echo esc_attr($unique_id); ?>"
   class="doc-search doc-search-search"
   x-data="docSearchSearch('<?php echo esc_url($endpoint); ?>')"
   x-init="initFromData($el)"
   data-doc-search-tax="<?php echo $tax_json_attr; ?>"
+  data-doc-search-pagination="<?php echo $pagination_config; ?>"
 >
   <label class="doc-search__label" for="doc-search-search-input">
     <?php echo esc_html( sprintf( __('Search %s', 'document-downloader'), $plural_lc ) ); ?>
@@ -202,7 +229,7 @@ final class Shortcode
       type="button" 
       class="doc-search__input-icon doc-search__input-icon--clear" 
       x-show="query.length > 0 && !loading" 
-      @click="query = ''; results = [];"
+      @click="query = ''; search();"
       :aria-label="'<?php esc_attr_e('Clear search', 'document-downloader'); ?>'"
       x-cloak
     >
@@ -230,21 +257,29 @@ final class Shortcode
     </template>
   </div>
 
-  <ul class="doc-search__list" :class="{ 'doc-search__list--visible': results.length > 0 }" aria-title="Document List">
-    <template x-for="item in results" :key="item.id">
-      <li class="doc-search__item">
-        <button
-          type="button"
-          class="doc-search__button doc-search__button--doc"
-          :data-ext="item.ext"
-          @click="onItemClick(item)"
-        >
-          <span class="doc-search__icon" aria-hidden="true" x-html="iconFor(item.ext)"></span>
-          <span class="doc-search__title" x-text="item.title"></span>
-        </button>
-      </li>
-    </template>
-  </ul>
+  <div class="doc-search__list" :class="{ 'doc-search__list--visible': currentPageResults.length > 0 }" role="region" aria-label="Document List">
+    <!-- Top pagination (if enabled) -->
+    <?php echo self::render_pagination_html('top'); ?>
+
+    <ul class="doc-search__list-items" role="list">
+      <template x-for="item in currentPageResults" :key="item.id">
+        <li class="doc-search__item">
+          <button
+            type="button"
+            class="doc-search__button doc-search__button--doc"
+            :data-ext="item.ext"
+            @click="onItemClick(item)"
+          >
+            <span class="doc-search__icon" aria-hidden="true" x-html="iconFor(item.ext)"></span>
+            <span class="doc-search__title" x-text="item.title"></span>
+          </button>
+        </li>
+      </template>
+    </ul>
+
+    <!-- Bottom pagination (if enabled) -->
+    <?php echo self::render_pagination_html('bottom'); ?>
+  </div>
 
   <dialog x-ref="dlg" class="doc-search__dialog" @click.self="$refs.dlg.close()">
     <button type="button" class="doc-search__dialog-close" @click="$refs.dlg.close()" aria-label="<?php esc_attr_e('Close', 'document-downloader'); ?>">✕</button>
@@ -304,8 +339,15 @@ final class Shortcode
         }
         wp_enqueue_style('doc-search-frontend');
 
-        // Parse attributes
-        $atts = shortcode_atts(['tax' => ''], $atts);
+        // Parse attributes with pagination defaults
+        $atts = shortcode_atts([
+            'tax' => '',
+            'id' => '',
+            'paginate' => 'false',
+            'rows_per_page' => '50',
+            'page_count' => '10',
+            'show_pagination' => 'true'
+        ], $atts);
         $tax_param = trim($atts['tax']);
 
         // Get taxonomy filter
@@ -323,15 +365,34 @@ final class Shortcode
         $endpoint = rest_url('document-downloader/v1/query');
         $log_endpoint = rest_url('document-downloader/v1/log');
 
+        // Generate unique ID if not provided
+        $unique_id = !empty($atts['id']) ? sanitize_html_class($atts['id']) : 'doc-search-list-' . wp_rand(1000, 9999);
+        
+        // Parse pagination attributes
+        $paginate = filter_var($atts['paginate'], FILTER_VALIDATE_BOOLEAN);
+        $rows_per_page = max(1, intval($atts['rows_per_page']));
+        $page_count = max(1, intval($atts['page_count']));
+        $show_pagination = filter_var($atts['show_pagination'], FILTER_VALIDATE_BOOLEAN);
+        
         $plural = strtolower($opts['plural']);
         $tax_json_attr = esc_attr(wp_json_encode($tax_slugs));
+        
+        // Pass pagination config to JavaScript
+        $pagination_config = esc_attr(wp_json_encode([
+            'enabled' => $paginate,
+            'rowsPerPage' => $rows_per_page,
+            'pageCount' => $page_count,
+            'showPagination' => $show_pagination
+        ]));
 
         ob_start(); ?>
 <div
+  id="<?php echo esc_attr($unique_id); ?>"
   class="doc-search doc-search-list"
   x-data="docSearchList('<?php echo esc_url($endpoint); ?>')"
   x-init="initFromData($el); loadAllDocuments()"
   data-doc-search-tax="<?php echo $tax_json_attr; ?>"
+  data-doc-search-pagination="<?php echo $pagination_config; ?>"
 >
 
   <label class="doc-search__label" for="doc-search-list-input">
@@ -390,9 +451,12 @@ final class Shortcode
     </template>
   </div>
 
-  <div class="doc-search__list-container">
-    <ul class="doc-search__list doc-search__list--static" x-show="filteredResults.length > 0" aria-title="Document List">
-      <template x-for="item in filteredResults" :key="item.id">
+  <div class="doc-search__list doc-search__list--static" x-show="currentPageResults.length > 0" role="region" aria-label="Document List">
+    <!-- Top pagination (if enabled) -->
+    <?php echo self::render_pagination_html('top'); ?>
+
+    <ul class="doc-search__list-items" role="list">
+      <template x-for="item in currentPageResults" :key="item.id">
         <li class="doc-search__item">
           <button
             type="button"
@@ -406,6 +470,9 @@ final class Shortcode
         </li>
       </template>
     </ul>
+
+    <!-- Bottom pagination (if enabled) -->
+    <?php echo self::render_pagination_html('bottom'); ?>
   </div>
 
   <dialog x-ref="dlg" class="doc-search__dialog" @click.self="$refs.dlg.close()">
@@ -451,6 +518,92 @@ final class Shortcode
     </form>
   </dialog>
 </div>
+<?php
+        return ob_get_clean();
+    }
+
+    /**
+     * Render pagination shortcode
+     */
+    public static function render_pagination($atts = [], $content = ''): string
+    {
+        $atts = shortcode_atts([
+            'target_id' => ''
+        ], $atts, 'wpe_document_pagination');
+
+        $target_id = sanitize_html_class($atts['target_id']);
+        if (empty($target_id)) {
+            return '<!-- wpe_document_pagination: target_id is required -->';
+        }
+
+        ob_start(); ?>
+<nav class="doc-search__pagination doc-search__pagination--hidden" data-pagination-target="<?php echo esc_attr($target_id); ?>" aria-label="<?php esc_attr_e('Document pagination', 'document-downloader'); ?>">
+  <div class="doc-search__pagination-wrapper">
+    <ul class="doc-search__pagination-list" role="list">
+      <!-- Pagination will be populated by JavaScript -->
+    </ul>
+  </div>
+</nav>
+<?php
+        return ob_get_clean();
+    }
+
+    /**
+     * Render pagination HTML for automatic inclusion
+     */
+    public static function render_pagination_html(string $position = 'bottom'): string
+    {
+        ob_start(); ?>
+<nav class="doc-search__pagination doc-search__pagination--<?php echo esc_attr($position); ?>" x-show="pagination.enabled && pagination.showPagination && pagination.totalPages > 1 && currentPageResults.length > 0" x-cloak style="display: none;">
+  <div class="doc-search__pagination-wrapper">
+    <ul class="doc-search__pagination-list" role="list" :aria-label="'<?php esc_attr_e('Document pagination', 'document-downloader'); ?> ' + (pagination.currentPage + 1) + ' <?php esc_attr_e('of', 'document-downloader'); ?> ' + pagination.totalPages">
+    
+    <!-- Previous button -->
+    <li class="doc-search__pagination-item">
+      <button 
+        type="button" 
+        class="doc-search__pagination-link doc-search__pagination-link--prev"
+        @click="goToPage(pagination.currentPage - 1)"
+        :disabled="pagination.currentPage === 0"
+        :aria-label="'<?php esc_attr_e('Go to previous page', 'document-downloader'); ?>'"
+      >
+        <span aria-hidden="true">&laquo;</span>
+        <span class="doc-search__pagination-text"><?php esc_html_e('Prev', 'document-downloader'); ?></span>
+      </button>
+    </li>
+    
+    <!-- Page number buttons -->
+    <template x-for="page in pagination.visiblePages" :key="page">
+      <li class="doc-search__pagination-item">
+        <button 
+          type="button" 
+          class="doc-search__pagination-link"
+          :class="{ 'doc-search__pagination-link--current': page === pagination.currentPage + 1 }"
+          @click="goToPage(page - 1)"
+          :aria-label="'<?php esc_attr_e('Go to page', 'document-downloader'); ?> ' + page"
+          :aria-current="page === pagination.currentPage + 1 ? 'page' : null"
+          x-text="page"
+        ></button>
+      </li>
+    </template>
+    
+    <!-- Next button -->
+    <li class="doc-search__pagination-item">
+      <button 
+        type="button" 
+        class="doc-search__pagination-link doc-search__pagination-link--next"
+        @click="goToPage(pagination.currentPage + 1)"
+        :disabled="pagination.currentPage === pagination.totalPages - 1"
+        :aria-label="'<?php esc_attr_e('Go to next page', 'document-downloader'); ?>'"
+      >
+        <span class="doc-search__pagination-text"><?php esc_html_e('Next', 'document-downloader'); ?></span>
+        <span aria-hidden="true">&raquo;</span>
+      </button>
+    </li>
+    
+    </ul>
+  </div>
+</nav>
 <?php
         return ob_get_clean();
     }

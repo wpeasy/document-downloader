@@ -110,7 +110,21 @@ The plugin stores documents in `/wp-content/uploads/documents/` and provides res
 [wpe_document_list] // Document listing (shows all documents, filters as you type)
 [wpe_document_search tax="type1,type2"] // Filter search by taxonomy
 [wpe_document_list tax="type1"] // Filter list by taxonomy
+
+// Pagination examples
+[wpe_document_list paginate="true" rows_per_page="20" show_pagination="true"]
+[wpe_document_search id="my-search" paginate="true" show_pagination="false"]
+[wpe_document_pagination target_id="my-search"] // External pagination control
 ```
+
+### Pagination Parameters
+
+Both shortcodes support comprehensive pagination:
+- `id` - Unique identifier for external pagination linking
+- `paginate` - Enable/disable pagination (default: false)  
+- `rows_per_page` - Items per page (default: 50)
+- `page_count` - Number of page links to show (default: 10)
+- `show_pagination` - Show automatic pagination controls (default: true)
 
 ### REST Endpoints
 

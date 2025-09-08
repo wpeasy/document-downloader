@@ -174,6 +174,12 @@ HTML;
     transform: translateY(0);
     visibility: visible;
   }
+  
+  .doc-search__list-items {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
 
   /* Static list for doc-search-list variant */
   .doc-search__list--static {
@@ -241,6 +247,28 @@ HTML;
   .doc-search__btn { border:1px solid #ddd; background:#fff; padding:.5rem .9rem; border-radius:8px; cursor:pointer; }
   .doc-search__btn--primary { border-color:#222; background:#222; color:#fff; }
   .doc-search__btn:disabled { opacity:.6; cursor:not-allowed; }
+
+  /* Pagination */
+  .doc-search__pagination { margin:1rem 0; display:flex; justify-content:center; position:relative; z-index:1001; }
+  
+  /* Pagination inside list container */
+  .doc-search__list .doc-search__pagination { margin:0.5rem 0; }
+  .doc-search__list .doc-search__pagination--top { margin:0 0 0.5rem 0; }
+  .doc-search__list .doc-search__pagination--bottom { margin:0.5rem 0 0 0; }
+  .doc-search__pagination[x-cloak], .doc-search__pagination[style*="display: none"], .doc-search__pagination--hidden { display:none !important; }
+  .doc-search__pagination:not([x-cloak]):not([style*="display: none"]):not(.doc-search__pagination--hidden) { display:flex; }
+  .doc-search__pagination--top { margin-bottom:1rem; margin-top:0; }
+  .doc-search__pagination--bottom { margin-top:1rem; margin-bottom:0; }
+  .doc-search__pagination-wrapper { display:flex; justify-content:center; width:100%; }
+  .doc-search__pagination-list { display:flex; list-style:none; margin:0; padding:0; gap:.25rem; align-items:center; }
+  .doc-search__pagination-item { margin:0; }
+  .doc-search__pagination-link { display:flex; align-items:center; gap:.5rem; padding:.75rem 1rem; border:1px solid #ddd; background:#fff; color:#333; text-decoration:none; border-radius:6px; cursor:pointer; font-size:1em; line-height:1.2; min-width:3rem; justify-content:center; transition:background-color .2s, border-color .2s; }
+  .doc-search__pagination-link:hover:not(:disabled) { background:#f5f5f5; border-color:#999; }
+  .doc-search__pagination-link:disabled { opacity:.5; cursor:not-allowed; }
+  .doc-search__pagination-link--current { background:#333; border-color:#333; color:#fff; }
+  .doc-search__pagination-link--current:hover { background:#222; border-color:#222; }
+  .doc-search__pagination-text { font-size:.875em; }
+  @media (max-width:600px) { .doc-search__pagination-text { display:none; } .doc-search__pagination-link { min-width:2.5rem; padding:.75rem; } }
 }
 CSS;
     }

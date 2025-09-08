@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.4(beta)] - 2025-09-08
+
+### Added
+- Comprehensive pagination system for both search and list shortcodes
+- New `[wpe_document_pagination target_id="x"]` shortcode for custom pagination placement
+- Pagination parameters: `id`, `paginate`, `rows_per_page`, `page_count`, `show_pagination`
+- Client-side pagination with visible page ranges and prev/next navigation
+- FOUC prevention for pagination controls with proper hiding/showing logic
+- Accessibility support with ARIA attributes and semantic navigation markup
+- External pagination linking - standalone pagination controls can target any shortcode instance
+
+### Changed
+- Pagination controls now appear inside styled result containers (with borders and shadows)
+- Both search and list shortcodes support identical pagination functionality
+- Updated Instructions page with comprehensive pagination documentation and examples
+- Enhanced HTML structure with proper wrappers around pagination and list items
+- Improved CSS with higher z-index for pagination controls and responsive design
+- Search shortcode now properly resets all state when clearing input via X button
+
+### Fixed
+- Search pagination now hides properly when search is cleared or has no results
+- Bottom pagination no longer disappears behind absolutely positioned result lists
+- Pagination display logic correctly respects `show_pagination` parameter
+- External pagination JavaScript properly handles wrapper structure and visibility
+- Form validation and pagination state management work correctly together
+
+### Technical
+- Added `doc-search__list-items` class for cleaner HTML structure separation
+- Implemented `doc-search__pagination-wrapper` for consistent layout control
+- Enhanced JavaScript with proper pagination state management and external linking
+- CSS improvements with dedicated pagination styling inside result containers
+- Proper z-index layering (pagination: 1001, results: 1000) for correct display order
+
 ## [1.0.3(beta)] - 2025-09-08
 
 ### Added
