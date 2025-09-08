@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.6(beta)] - 2025-09-08
+
+### Confirmed
+- Document results already sorted alphabetically by title for both search and list shortcodes via REST API endpoint
+
 ## [1.0.5(beta)] - 2025-09-08
 
 ### Fixed
