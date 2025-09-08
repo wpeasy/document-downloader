@@ -40,7 +40,9 @@ final class REST_API
                 'callback'            => [__CLASS__, 'handle_log_download'],
                 'permission_callback' => [__CLASS__, 'permission'],
                 'args'                => [
-                    'email'    => ['type' => 'string', 'required' => true,  'sanitize_callback' => 'sanitize_email'],
+                    'email'    => ['type' => 'string', 'required' => false, 'sanitize_callback' => 'sanitize_email'],
+                    'name'     => ['type' => 'string', 'required' => false, 'sanitize_callback' => 'sanitize_text_field'],
+                    'phone'    => ['type' => 'string', 'required' => false, 'sanitize_callback' => 'sanitize_text_field'],
                     'filename' => ['type' => 'string', 'required' => true,  'sanitize_callback' => 'sanitize_text_field'],
                     'title'    => ['type' => 'string', 'required' => false, 'sanitize_callback' => 'sanitize_text_field'],
                     'url'      => ['type' => 'string', 'required' => false, 'sanitize_callback' => 'esc_url_raw'],
@@ -78,7 +80,7 @@ final class REST_API
             $json   = (array) $request->get_json_params();
             $custom = (string) ($json['nonce'] ?? '');
         }
-        if ($custom && wp_verify_nonce($custom, 'dd_query')) {
+        if ($custom && wp_verify_nonce($custom, 'doc_search_query')) {
             return true;
         }
 
@@ -104,7 +106,9 @@ final class REST_API
             `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             `post_title` VARCHAR(255) NULL,
             `file_name` VARCHAR(255) NOT NULL,
-            `email` VARCHAR(190) NOT NULL,
+            `email` VARCHAR(190) NULL,
+            `name` VARCHAR(255) NULL,
+            `phone` VARCHAR(50) NULL,
             `downloaded_at` DATETIME NOT NULL,
             `ip` VARCHAR(45) NULL,
             `url` TEXT NULL,
@@ -113,6 +117,18 @@ final class REST_API
             KEY `date_idx` (`downloaded_at`)
         ) {$charset};";
         $wpdb->query($sql);
+        
+        // Add name and phone columns if they don't exist (for existing installations)
+        $columns = $wpdb->get_results("SHOW COLUMNS FROM `{$table}` LIKE 'name'");
+        if (empty($columns)) {
+            $wpdb->query("ALTER TABLE `{$table}` ADD COLUMN `name` VARCHAR(255) NULL AFTER `email`");
+        }
+        
+        $columns = $wpdb->get_results("SHOW COLUMNS FROM `{$table}` LIKE 'phone'");
+        if (empty($columns)) {
+            $wpdb->query("ALTER TABLE `{$table}` ADD COLUMN `phone` VARCHAR(50) NULL AFTER `name`");
+        }
+        
         return $table;
     }
 
@@ -134,7 +150,8 @@ final class REST_API
         $s    = trim((string) ($body['search'] ?? ''));
         $tax  = isset($body['tax']) && is_array($body['tax']) ? array_filter(array_map('sanitize_title', $body['tax'])) : [];
 
-        if ($s === '' || mb_strlen($s) < 3) return new WP_REST_Response([], 200);
+        // Allow empty search for listing all documents, but require 3+ chars for actual search
+        if ($s !== '' && mb_strlen($s) < 3) return new WP_REST_Response([], 200);
         if (mb_strlen($s) > 100)        return new WP_REST_Response(['error' => 'too_long'], 400);
         
         // Check if search query matches excluded terms
@@ -145,14 +162,18 @@ final class REST_API
         $args = [
             'post_type'       => CPT::POST_TYPE,
             'post_status'     => 'publish',
-            's'               => $s,
-            'search_columns'  => ['post_title'],
             'nopaging'        => true,
             'no_found_rows'   => true,
             'orderby'         => 'title',
             'order'           => 'ASC',
             'fields'          => 'ids',
         ];
+
+        // Only add search if query is not empty
+        if ($s !== '') {
+            $args['s'] = $s;
+            $args['search_columns'] = ['post_title'];
+        }
 
         if ($tax) {
             $args['tax_query'] = [[
@@ -214,11 +235,13 @@ final class REST_API
 
         $body     = (array) $req->get_json_params();
         $email    = sanitize_email((string)($body['email'] ?? ''));
+        $name     = sanitize_text_field((string)($body['name'] ?? ''));
+        $phone    = sanitize_text_field((string)($body['phone'] ?? ''));
         $filename = sanitize_file_name((string)($body['filename'] ?? ''));
         $title    = sanitize_text_field((string)($body['title'] ?? ''));
         $url      = isset($body['url']) ? esc_url_raw((string)$body['url']) : '';
 
-        if (!is_email($email) || $filename === '') {
+        if ($filename === '') {
             return new WP_REST_Response(['error' => 'bad_request'], 400);
         }
 
@@ -231,13 +254,15 @@ final class REST_API
             'post_title'    => $title,
             'file_name'     => $filename,
             'email'         => $email,
+            'name'          => $name,
+            'phone'         => $phone,
             'downloaded_at' => $now,
             'ip'            => $ip,
             'url'           => $url,
-        ], ['%s','%s','%s','%s','%s','%s']);
+        ], ['%s','%s','%s','%s','%s','%s','%s','%s']);
 
         // Send notification email if enabled
-        self::maybe_send_notification($title, $filename, $email, $url);
+        self::maybe_send_notification($title, $filename, $email, $name, $phone, $url);
 
         return new WP_REST_Response(['ok' => true], 201);
     }
@@ -245,7 +270,7 @@ final class REST_API
     /**
      * Send notification email if notify_email setting is enabled
      */
-    private static function maybe_send_notification(string $title, string $filename, string $email, string $url): void
+    private static function maybe_send_notification(string $title, string $filename, string $email, string $name, string $phone, string $url): void
     {
         $opts = Settings::get_options();
         
@@ -259,7 +284,9 @@ final class REST_API
         $placeholders = [
             '{file_name}' => $filename,
             '{title}'     => $title ?: $filename,
-            '{email}'     => $email,
+            '{email}'     => $email ?: 'N/A',
+            '{name}'      => $name ?: 'N/A',
+            '{phone}'     => $phone ?: 'N/A',
             '{date}'      => current_time('F j, Y g:i A'),
             '{url}'       => $url ?: 'N/A',
             '{ip}'        => $_SERVER['REMOTE_ADDR'] ?? 'Unknown',
@@ -267,7 +294,7 @@ final class REST_API
         
         // Replace placeholders in subject and message
         $subject = str_replace(array_keys($placeholders), array_values($placeholders), $opts['notification_subject']);
-        $message = str_replace(array_keys($placeholders), array_values($placeholders), $opts['notification_message']);
+        $message = self::process_conditional_placeholders($opts['notification_message'], $placeholders);
         
         // Apply wpautop to format paragraphs and line breaks properly
         $message = wpautop($message);
@@ -331,5 +358,62 @@ final class REST_API
         $regex = '/^' . str_replace('\\*', '.*', preg_quote($pattern, '/')) . '$/';
         
         return preg_match($regex, $query) === 1;
+    }
+
+    /**
+     * Process conditional placeholders in notification messages
+     * 
+     * Supports:
+     * {?field:content} - Show content only if field has value
+     * {?field!otherfield:content} - Show content only if field has value and otherfield doesn't
+     * 
+     * @param string $message The message template with conditional placeholders
+     * @param array $placeholders Array of placeholder values
+     * @return string Processed message with conditionals resolved
+     */
+    private static function process_conditional_placeholders(string $message, array $placeholders): string
+    {
+        // Process conditional placeholders with recursive approach to handle nested braces
+        // Pattern: {?field:content} where content can contain other placeholders
+        
+        $processed = $message;
+        $max_iterations = 10; // Prevent infinite loops
+        $iteration = 0;
+        
+        while ($iteration < $max_iterations && preg_match('/\{\?([^:}]+):(.*?)\}(?=\s|$|<|{|\})/s', $processed)) {
+            $processed = preg_replace_callback(
+                '/\{\?([^:}]+):(.*?)\}(?=\s|$|<|{|\})/s',
+                function ($matches) use ($placeholders) {
+                    $condition = trim($matches[1]);
+                    $content = $matches[2];
+                    
+                    // Check for negation syntax: field!otherfield
+                    if (strpos($condition, '!') !== false) {
+                        [$required_field, $excluded_field] = explode('!', $condition, 2);
+                        $required_key = '{' . trim($required_field) . '}';
+                        $excluded_key = '{' . trim($excluded_field) . '}';
+                        
+                        // Show content only if required field has value AND excluded field doesn't
+                        $has_required = isset($placeholders[$required_key]) && $placeholders[$required_key] !== '' && $placeholders[$required_key] !== 'N/A';
+                        $has_excluded = isset($placeholders[$excluded_key]) && $placeholders[$excluded_key] !== '' && $placeholders[$excluded_key] !== 'N/A';
+                        
+                        return ($has_required && !$has_excluded) ? $content : '';
+                    } else {
+                        // Simple condition: field
+                        $field_key = '{' . trim($condition) . '}';
+                        $has_value = isset($placeholders[$field_key]) && $placeholders[$field_key] !== '' && $placeholders[$field_key] !== 'N/A';
+                        
+                        return $has_value ? $content : '';
+                    }
+                },
+                $processed
+            );
+            $iteration++;
+        }
+        
+        // Replace remaining regular placeholders
+        $processed = str_replace(array_keys($placeholders), array_values($placeholders), $processed);
+        
+        return $processed;
     }
 }

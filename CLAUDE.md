@@ -6,11 +6,12 @@ This WordPress plugin provides a document download management system with search
 
 - Upload and manage documents (PDF, Office docs, images) via a custom post type
 - Search documents through a frontend shortcode with AlpineJS-powered interface  
+- List all documents with client-side filtering using the document list shortcode
 - Download documents with optional email gate for lead capture
 - Track downloads with logging to database
 - Organize documents with custom taxonomy (Document Types)
 
-The plugin stores documents in `/wp-content/uploads/documents/` and provides a responsive search interface that can be embedded anywhere using the `[wpe_document_search]` shortcode.
+The plugin stores documents in `/wp-content/uploads/documents/` and provides responsive interfaces that can be embedded anywhere using `[wpe_document_search]` (search interface) or `[wpe_document_list]` (document listing) shortcodes.
 
 ## Architecture
 
@@ -25,20 +26,21 @@ The plugin stores documents in `/wp-content/uploads/documents/` and provides a r
 - `CPT` - Registers custom post type and taxonomy
 - `Meta` - Handles file upload metabox and media library integration
 - `Settings` - Admin settings page with CSS customization
-- `Shortcode` - Frontend search interface rendering and asset management
+- `Shortcode` - Frontend search and list interface rendering and asset management
 - `REST_API` - Search endpoint and download logging API
 - `Admin_Downloads` - Download tracking admin interface
+- `Instructions` - Instructions admin page with documentation
 - `Activator` - Plugin activation hooks
 
 ## Code Style Guidelines
 
 ### PHP Conventions
 
-1. **Namespace**: All classes use `WP_Easy\DocumentAddressSearch` namespace
+1. **Namespace**: All classes use `WP_Easy\DocumentDownloader` namespace
 2. **Class Structure**: Final classes with static methods for WordPress hooks
 3. **Security**: Always use `defined('ABSPATH') || exit;` at top of files
 4. **Sanitization**: Extensive use of WordPress sanitization functions
-5. **Nonces**: WordPress nonces for security, custom `dd_query` nonce for REST API
+5. **Nonces**: WordPress nonces for security, custom `doc_search_query` nonce for REST API
 6. **Constants**: Plugin paths defined as constants (`DD_PLUGIN_PATH`, `DD_PLUGIN_URL`, `DD_META_KEY`)
 
 ### Method Patterns
@@ -104,8 +106,10 @@ The plugin stores documents in `/wp-content/uploads/documents/` and provides a r
 ### Shortcode Usage
 
 ```php
-[wpe_document_search] // Basic usage
-[wpe_document_search tax="type1,type2"] // Filter by taxonomy
+[wpe_document_search] // Search interface (shows results after 3+ characters)
+[wpe_document_list] // Document listing (shows all documents, filters as you type)
+[wpe_document_search tax="type1,type2"] // Filter search by taxonomy
+[wpe_document_list tax="type1"] // Filter list by taxonomy
 ```
 
 ### REST Endpoints
@@ -118,6 +122,7 @@ The plugin stores documents in `/wp-content/uploads/documents/` and provides a r
 - Plugin follows WordPress plugin standards
 - Uses modern PHP features while maintaining 7.4 compatibility
 - Frontend uses modern JavaScript (ES6+) with graceful degradation
-- CSS uses modern features (Grid, Flexbox, CSS Custom Properties)
+- CSS uses modern features (Grid, Flexbox, CSS Custom Properties) with `@layer docSearch` for easy theme overrides
 - Extensive use of WordPress core functions and APIs
 - No external dependencies beyond WordPress and optional AlpineJS CDN
+- Role-based access control: Settings for administrators, other features for editors and above

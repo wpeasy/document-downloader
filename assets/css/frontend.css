@@ -1,37 +1,37 @@
 /* Low-priority cascade layer so themes override easily */
-@layer das {
-  .das {
-    --das-status-lines: 1;
-    --das-status-lh: 1.25;
+@layer docSearch {
+  .doc-search {
+    --doc-search-status-lines: 1;
+    --doc-search-status-lh: 1.25;
     max-width: 640px;
     margin: 1rem 0;
   }
 
-  .das__label { display:block; margin-bottom:.25rem; font-weight:600; }
+  .doc-search__label { display:block; margin-bottom:.25rem; font-weight:600; }
 
-  .das__input {
+  .doc-search__input {
     width:100%;
     padding:.5rem .75rem;
     border:1px solid #ccc;
     border-radius:6px;
   }
-  .das__input:focus { outline:none; border-color:#999; }
+  .doc-search__input:focus { outline:none; border-color:#999; }
 
   /* Fixed-height status wrapper prevents layout shift */
-  .das__statuswrap {
+  .doc-search__statuswrap {
     display:flex;
     align-items:center;
-    line-height: var(--das-status-lh);
-    min-block-size: calc(var(--das-status-lines) * 1em * var(--das-status-lh));
+    line-height: var(--doc-search-status-lh);
+    min-block-size: calc(var(--doc-search-status-lines) * 1em * var(--doc-search-status-lh));
   }
 
-  .das__status { margin:0; font-style:italic; opacity:.85; }
+  .doc-search__status { margin:0; font-style:italic; opacity:.85; }
 
-  .das__list { list-style:none; padding:0; margin:.75rem 0 0 0; }
-  .das__item { margin:0 0 .5rem 0; }
+  .doc-search__list { list-style:none; padding:0; margin:.75rem 0 0 0; }
+  .doc-search__item { margin:0 0 .5rem 0; }
 
   /* Button styling (works for <button> and <a>) */
-  .das__button {
+  .doc-search__button {
     display:inline-flex;
     align-items:center;
     gap:.5rem;
@@ -43,34 +43,34 @@
     text-decoration:none;
     color:inherit; /* icons inherit via currentColor */
   }
-  .das__button:hover { background:#f7f7f7; }
-  .das__button:disabled { opacity:.6; cursor:not-allowed; }
+  .doc-search__button:hover { background:#f7f7f7; }
+  .doc-search__button:disabled { opacity:.6; cursor:not-allowed; }
 
-  .das__icon { line-height:0; display:inline-flex; }
+  .doc-search__icon { line-height:0; display:inline-flex; }
   /* Inline SVG: no fixed width/height; height set to 1.3em; width auto */
-  .das__icon svg {
+  .doc-search__icon svg {
     height:1.3em;
     width:auto;
     display:block;
   }
 
-  .das__title { line-height:1.2; }
+  .doc-search__title { line-height:1.2; }
 
   /* Dialog styles */
-  .das__dialog {
+  .doc-search__dialog {
     border: 1px solid #ddd;
     border-radius: 12px;
     padding: 1rem 1rem 1rem 1rem;
     max-width: 420px;
     width: calc(100% - 2rem);
   }
-  .das__dialog::backdrop {
+  .doc-search__dialog::backdrop {
     background: rgba(0,0,0,.45);
   }
-  .das__dialog-title { margin: 0 0 .25rem 0; font-weight: 600; font-size: 1.05rem; }
-  .das__dialog-file { margin: 0 0 .75rem 0; opacity: .8; word-break: break-all; }
+  .doc-search__dialog-title { margin: 0 0 .25rem 0; font-weight: 600; font-size: 1.05rem; }
+  .doc-search__dialog-file { margin: 0 0 .75rem 0; opacity: .8; word-break: break-all; }
 
-  .das__dialog-close {
+  .doc-search__dialog-close {
     position: absolute;
     top: .5rem;
     right: .5rem;
@@ -81,27 +81,27 @@
     cursor: pointer;
   }
 
-  .das__field { display:block; margin: 0 0 .75rem 0; }
-  .das__field-label { display:block; font-size: .9rem; margin-bottom:.25rem; }
-  .das__field-input {
+  .doc-search__field { display:block; margin: 0 0 .75rem 0; }
+  .doc-search__field-label { display:block; font-size: .9rem; margin-bottom:.25rem; }
+  .doc-search__field-input {
     width:100%;
     padding:.5rem .75rem;
     border:1px solid #ccc;
     border-radius:6px;
   }
 
-  .das__actions { display:flex; gap:.5rem; }
-  .das__btn {
+  .doc-search__actions { display:flex; gap:.5rem; }
+  .doc-search__btn {
     border:1px solid #ddd;
     background:#fff;
     padding:.5rem .9rem;
     border-radius: 8px;
     cursor:pointer;
   }
-  .das__btn--primary {
+  .doc-search__btn--primary {
     border-color:#222;
     background:#222;
     color:#fff;
   }
-  .das__btn:disabled { opacity:.6; cursor:not-allowed; }
+  .doc-search__btn:disabled { opacity:.6; cursor:not-allowed; }
 }

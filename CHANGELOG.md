@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.3(beta)] - 2025-09-08
+
+### Added
+- New `[wpe_document_list]` shortcode that displays all documents by default with client-side filtering
+- Instructions admin page with comprehensive documentation for shortcodes, settings, and troubleshooting
+- Role-based access control: Settings restricted to administrators, other features available to editors
+- Form validation with visual feedback (red borders, validation messages) for download dialogs
+- Required field indicators (*) and real-time validation for email, name, and phone fields
+- Support for both search and list functionality with shared validation logic
+
+### Changed
+- Complete codebase refactoring from 'dd'/'das' to 'doc-search'/'docSearch' naming convention
+- CSS layer renamed from `doc-search` to `docSearch` for better JavaScript compatibility
+- BEM class methodology updated to use `doc-search__` prefix throughout
+- Original shortcode now has `doc-search-search` class, new list shortcode uses `doc-search-list`
+- CSS custom properties updated to `--doc-search-*` naming
+- Removed legacy `dd dd--component` classes from HTML templates
+- Admin Downloads page now accessible to editors (not just administrators)
+
+### Fixed
+- Document file uploader metabox now appears correctly (was completely missing)
+- Fixed metabox registration using proper WordPress `add_meta_boxes` hook instead of custom action
+- AlpineJS class binding syntax updated from object notation to ternary operators for validation
+- CSS validation styles now use `!important` to override theme styles
+- Form validation feedback now shows proper visual indicators
+- JavaScript factory functions renamed and updated consistently across all files
+
+### Technical
+- REST API modified to support empty queries for document listing functionality
+- JavaScript files renamed: `alpine-search.js` → `doc-search-alpine-search.js`, `alpine-list.js` → `doc-search-alpine-list.js`
+- Enhanced debugging added to document uploader for troubleshooting
+- Systematic naming convention applied across PHP classes, JavaScript variables, CSS classes, and HTML IDs
+
+## [1.0.2(beta)] - Previous Release
+
 ### Added
 - New "Notifications" settings tab for email customization
 - Email notification templates with WYSIWYG editor and placeholder system

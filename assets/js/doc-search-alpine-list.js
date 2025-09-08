@@ -1,34 +1,44 @@
-// assets/js/alpine-search.js
-// - POST to REST with DD nonces
-// - Taxonomy slugs are read from data attribute via initFromData($el)
-// - Email gate + logging (includes post title)
+// assets/js/alpine-list.js
+// Document list component - shows all documents by default with filtering
+// - GET all documents on load
+// - Filter documents client-side
 
 (() => {
-  const ddFactory = (endpoint) => ({
+  const docSearchListFactory = (endpoint) => ({
     endpoint,
     tax: [],
 
     query: '',
-    results: [],
+    allDocuments: [],
+    filteredResults: [],
     loading: false,
     error: false,
 
     // Download workflow state
-    requireEmail: !!(window.DDOptions && DDOptions.requireEmail),
-    logEndpoint: (window.DDOptions && DDOptions.logEndpoint) ? String(DDOptions.logEndpoint) : '',
+    requireEmail: !!(window.DocSearchOptions && DocSearchOptions.requireEmail),
+    requireName: !!(window.DocSearchOptions && DocSearchOptions.requireName),
+    requirePhone: !!(window.DocSearchOptions && DocSearchOptions.requirePhone),
+    logEndpoint: (window.DocSearchOptions && DocSearchOptions.logEndpoint) ? String(DocSearchOptions.logEndpoint) : '',
     email: '',
-    emailValid: false,
+    name: '',
+    phone: '',
+    formValid: false,
+    emailInvalid: false,
+    nameInvalid: false,
+    phoneInvalid: false,
+    emailMessage: '',
+    nameMessage: '',
+    phoneMessage: '',
     downloading: false,
     pendingItem: null,
     pendingFileName: '',
 
     _debounceTimer: null,
-    _abortController: null,
 
     // Read JSON array from data-dd-tax attribute
     initFromData(el) {
       try {
-        const raw = el?.dataset?.ddTax ?? '[]';
+        const raw = el?.dataset?.docSearchTax ?? '[]';
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) this.tax = parsed;
       } catch (e) {
@@ -36,30 +46,7 @@
       }
     },
 
-    debouncedSearch() {
-      clearTimeout(this._debounceTimer);
-      this._debounceTimer = setTimeout(() => this.search(), 500);
-    },
-
-    async search() {
-      const q = this.query.trim();
-
-      if (q.length < 3) {
-        this.results = [];
-        this.loading = false;
-        this.error = false;
-        if (this._abortController) {
-          this._abortController.abort();
-          this._abortController = null;
-        }
-        return;
-      }
-
-      if (this._abortController) {
-        this._abortController.abort();
-      }
-      this._abortController = new AbortController();
-
+    async loadAllDocuments() {
       this.loading = true;
       this.error = false;
 
@@ -69,13 +56,13 @@
           'Content-Type': 'application/json'
         };
 
-        const wpRestNonce = (window.DDRest && DDRest.wpRestNonce) ? String(DDRest.wpRestNonce) : '';
-        const ddNonce     = (window.DDRest && DDRest.ddNonce) ? String(DDRest.ddNonce) : '';
+        const wpRestNonce = (window.DocSearchRest && DocSearchRest.wpRestNonce) ? String(DocSearchRest.wpRestNonce) : '';
+        const ddNonce     = (window.DocSearchRest && DocSearchRest.ddNonce) ? String(DocSearchRest.ddNonce) : '';
 
         if (wpRestNonce) headers['X-WP-Nonce'] = wpRestNonce;
         if (ddNonce)     headers['X-DD-Nonce'] = ddNonce;
 
-        const body = { search: q, tax: this.tax };
+        const body = { search: '', tax: this.tax };
         if (ddNonce) body.nonce = ddNonce;
 
         const res = await fetch(this.endpoint, {
@@ -83,27 +70,45 @@
           headers,
           credentials: 'same-origin',
           cache: 'no-store',
-          body: JSON.stringify(body),
-          signal: this._abortController.signal
+          body: JSON.stringify(body)
         });
 
         if (!res.ok) {
-          this.results = [];
+          this.allDocuments = [];
+          this.filteredResults = [];
           this.error = true;
           return;
         }
 
         const data = await res.json();
-        this.results = Array.isArray(data) ? data : [];
+        this.allDocuments = Array.isArray(data) ? data : [];
+        this.filteredResults = [...this.allDocuments];
         this.error = false;
       } catch (err) {
-        if (!err || err.name !== 'AbortError') {
-          this.results = [];
-          this.error = true;
-        }
+        this.allDocuments = [];
+        this.filteredResults = [];
+        this.error = true;
       } finally {
         this.loading = false;
       }
+    },
+
+    debouncedFilter() {
+      clearTimeout(this._debounceTimer);
+      this._debounceTimer = setTimeout(() => this.filterDocuments(), 300);
+    },
+
+    filterDocuments() {
+      const q = this.query.trim().toLowerCase();
+      
+      if (q === '') {
+        this.filteredResults = [...this.allDocuments];
+        return;
+      }
+
+      this.filteredResults = this.allDocuments.filter(item => {
+        return item.title.toLowerCase().includes(q);
+      });
     },
 
     onItemClick(item) {
@@ -111,21 +116,81 @@
       this.pendingItem = item;
       this.pendingFileName = filename;
 
-      if (!this.requireEmail) {
+      if (!this.requireEmail && !this.requireName && !this.requirePhone) {
         this.doDownload(item.url, filename);
         return;
       }
 
       this.email = '';
-      this.emailValid = false;
+      this.name = '';
+      this.phone = '';
+      this.formValid = false;
+      this.emailInvalid = false;
+      this.nameInvalid = false;
+      this.phoneInvalid = false;
+      this.emailMessage = '';
+      this.nameMessage = '';
+      this.phoneMessage = '';
       if (this.$refs && this.$refs.dlg && typeof this.$refs.dlg.showModal === 'function') {
         this.$refs.dlg.showModal();
       }
     },
 
-    validateEmail() {
-      const e = (this.email || '').trim();
-      this.emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+    validateForm() {
+      let valid = true;
+
+      // Check email if required
+      if (this.requireEmail) {
+        const e = (this.email || '').trim();
+        if (e.length === 0) {
+          this.emailInvalid = true;
+          this.emailMessage = 'Email address is required';
+          valid = false;
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+          this.emailInvalid = true;
+          this.emailMessage = 'Please enter a valid email address';
+          valid = false;
+        } else {
+          this.emailInvalid = false;
+          this.emailMessage = '';
+        }
+      }
+
+      // Check name if required
+      if (this.requireName) {
+        const n = (this.name || '').trim();
+        if (n.length === 0) {
+          this.nameInvalid = true;
+          this.nameMessage = 'Name is required';
+          valid = false;
+        } else if (n.length < 2) {
+          this.nameInvalid = true;
+          this.nameMessage = 'Name must be at least 2 characters';
+          valid = false;
+        } else {
+          this.nameInvalid = false;
+          this.nameMessage = '';
+        }
+      }
+
+      // Check phone if required
+      if (this.requirePhone) {
+        const p = (this.phone || '').trim();
+        if (p.length === 0) {
+          this.phoneInvalid = true;
+          this.phoneMessage = 'Phone number is required';
+          valid = false;
+        } else if (p.length < 7) {
+          this.phoneInvalid = true;
+          this.phoneMessage = 'Please enter a valid phone number';
+          valid = false;
+        } else {
+          this.phoneInvalid = false;
+          this.phoneMessage = '';
+        }
+      }
+
+      this.formValid = valid;
     },
 
     async submitEmailAndDownload() {
@@ -135,18 +200,20 @@
 
       this.downloading = true;
       try {
-        if (this.logEndpoint && this.emailValid) {
+        if (this.logEndpoint && this.formValid) {
           const headers = {
             'Accept': 'application/json',
             'Content-Type': 'application/json'
           };
-          const wpRestNonce = (window.DDRest && DDRest.wpRestNonce) ? String(DDRest.wpRestNonce) : '';
-          const ddNonce     = (window.DDRest && DDRest.ddNonce) ? String(DDRest.ddNonce) : '';
+          const wpRestNonce = (window.DocSearchRest && DocSearchRest.wpRestNonce) ? String(DocSearchRest.wpRestNonce) : '';
+          const ddNonce     = (window.DocSearchRest && DocSearchRest.ddNonce) ? String(DocSearchRest.ddNonce) : '';
           if (wpRestNonce) headers['X-WP-Nonce'] = wpRestNonce;
           if (ddNonce)     headers['X-DD-Nonce'] = ddNonce;
 
           const payload = {
             email: String(this.email || ''),
+            name: String(this.name || ''),
+            phone: String(this.phone || ''),
             filename,
             title: String(item.title || ''),
             url: String(item.url || '')
@@ -208,17 +275,17 @@
     },
 
     iconFor(ext) {
-      const map = (window.DDIconsInline || {});
+      const map = (window.DocSearchIconsInline || {});
       const key = (ext || 'file').toLowerCase();
       return map[key] || map.file || '';
     }
   });
 
   // Make it available both ways:
-  window.ddSearch = ddFactory; // direct global for x-data="ddSearch(...)"
+  window.docSearchList = docSearchListFactory; // direct global for x-data="ddList(...)"
   document.addEventListener('alpine:init', () => {
     if (window.Alpine && typeof window.Alpine.data === 'function') {
-      window.Alpine.data('ddSearch', ddFactory);
+      window.Alpine.data('docSearchList', docSearchListFactory);
     }
   });
 })();

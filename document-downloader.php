@@ -2,7 +2,7 @@
 /**
  * Plugin Name:  Document Downloader
  * Description:  Document Download Manager
- * Version:      1.0.2(beta)
+ * Version:      1.0.3(beta)
  * Requires PHP: 7.4
  * Author:       Alan Blair<alan@wpeasy.au>
  * Text Domain:  document-downloader
@@ -32,6 +32,7 @@ add_action('plugins_loaded', static function () {
     WP_Easy\DocumentDownloader\Shortcode::init();        // Shortcode + assets
     WP_Easy\DocumentDownloader\REST_API::init();         // Endpoints
     WP_Easy\DocumentDownloader\Admin_Downloads::init();  // Downloads admin
+    WP_Easy\DocumentDownloader\Instructions::init();     // Instructions page
 });
 
 // Ensure uploads/documents exists

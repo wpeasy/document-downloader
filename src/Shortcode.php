@@ -7,7 +7,8 @@ final class Shortcode
 {
     public static function init(): void
     {
-        add_shortcode('wpe_document_search', [__CLASS__, 'render']);
+        add_shortcode('wpe_document_search', [__CLASS__, 'render_search']);
+        add_shortcode('wpe_document_list', [__CLASS__, 'render_list']);
         add_action('wp_enqueue_scripts', [__CLASS__, 'assets']);
     }
 
@@ -15,14 +16,25 @@ final class Shortcode
     {
         // Component JS
         wp_register_script(
-            'dd-alpine-search',
-            DD_PLUGIN_URL . 'assets/js/alpine-search.js',
+            'doc-search-alpine-search',
+            DD_PLUGIN_URL . 'assets/js/doc-search-alpine-search.js',
             [],
             '2.0.3',
             false
         );
         if (function_exists('wp_script_add_data')) {
-            wp_script_add_data('dd-alpine-search', 'defer', true);
+            wp_script_add_data('doc-search-alpine-search', 'defer', true);
+        }
+
+        wp_register_script(
+            'doc-search-alpine-list',
+            DD_PLUGIN_URL . 'assets/js/doc-search-alpine-list.js',
+            [],
+            '2.0.3',
+            false
+        );
+        if (function_exists('wp_script_add_data')) {
+            wp_script_add_data('doc-search-alpine-list', 'defer', true);
         }
 
         // Alpine (optional)
@@ -40,14 +52,16 @@ final class Shortcode
         }
 
         // Nonces + options for JS
-        wp_localize_script('dd-alpine-search', 'DDRest', [
+        wp_localize_script('doc-search-alpine-search', 'DocSearchRest', [
             'wpRestNonce' => wp_create_nonce('wp_rest'),
-            'ddNonce'     => wp_create_nonce('dd_query'),
+            'ddNonce'     => wp_create_nonce('doc_search_query'),
         ]);
 
         $opts = Settings::get_options();
-        wp_localize_script('dd-alpine-search', 'DDOptions', [
+        wp_localize_script('doc-search-alpine-search', 'DocSearchOptions', [
             'requireEmail' => (bool)$opts['require_email'],
+            'requireName'  => (bool)$opts['require_name'],
+            'requirePhone' => (bool)$opts['require_phone'],
             'notifyEmail'  => (string)$opts['notification_email'],
             'logEndpoint'  => rest_url('document-downloader/v1/log'),
         ]);
@@ -100,26 +114,42 @@ final class Shortcode
             $icons_inline[$ext] = $svg;
         }
 
-        wp_localize_script('dd-alpine-search', 'DDIconsInline', $icons_inline);
+        wp_localize_script('doc-search-alpine-search', 'DocSearchIconsInline', $icons_inline);
+
+        // Localize for list script as well
+        wp_localize_script('doc-search-alpine-list', 'DocSearchRest', [
+            'wpRestNonce' => wp_create_nonce('wp_rest'),
+            'ddNonce'     => wp_create_nonce('doc_search_query'),
+        ]);
+
+        wp_localize_script('doc-search-alpine-list', 'DocSearchOptions', [
+            'requireEmail' => (bool)$opts['require_email'],
+            'requireName'  => (bool)$opts['require_name'],
+            'requirePhone' => (bool)$opts['require_phone'],
+            'notifyEmail'  => (string)$opts['notification_email'],
+            'logEndpoint'  => rest_url('document-downloader/v1/log'),
+        ]);
+
+        wp_localize_script('doc-search-alpine-list', 'DocSearchIconsInline', $icons_inline);
 
         // Frontend CSS (from settings)
-        wp_register_style('dd-frontend', false, [], '2.0.0');
+        wp_register_style('doc-search-frontend', false, [], '2.0.0');
         $css = Settings::get_frontend_css();
         if (is_string($css) && $css !== '') {
-            wp_add_inline_style('dd-frontend', $css);
+            wp_add_inline_style('doc-search-frontend', $css);
         }
     }
 
-    public static function render($atts = [], $content = ''): string
+    public static function render_search($atts = [], $content = ''): string
     {
         // Scripts / styles
-        wp_enqueue_script('dd-alpine-search');
+        wp_enqueue_script('doc-search-alpine-search');
         $opts = Settings::get_options();
         if (empty($opts['disable_alpine'])) {
             if (wp_script_is('alpine', 'registered')) wp_enqueue_script('alpine');
             else wp_enqueue_script('alpinejs');
         }
-        wp_enqueue_style('dd-frontend');
+        wp_enqueue_style('doc-search-frontend');
 
         $endpoint  = esc_url_raw(rest_url('document-downloader/v1/query'));
         $labels    = Settings::get_labels();
@@ -137,19 +167,19 @@ final class Shortcode
 
         ob_start(); ?>
 <div
-  class="dd dd--component"
-  x-data="ddSearch('<?php echo esc_url($endpoint); ?>')"
+  class="doc-search doc-search-search"
+  x-data="docSearchSearch('<?php echo esc_url($endpoint); ?>')"
   x-init="initFromData($el)"
-  data-dd-tax="<?php echo $tax_json_attr; ?>"
+  data-doc-search-tax="<?php echo $tax_json_attr; ?>"
 >
-  <label class="dd__label" for="dd-search-input">
+  <label class="doc-search__label" for="doc-search-search-input">
     <?php echo esc_html( sprintf( __('Search %s', 'document-downloader'), $plural_lc ) ); ?>
   </label>
 
-  <div class="dd__input-wrapper">
+  <div class="doc-search__input-wrapper">
     <input
-      id="dd-search-input"
-      class="dd__input"
+      id="doc-search-search-input"
+      class="doc-search__input"
       type="search"
       placeholder="<?php esc_attr_e('Type at least 3 characters…', 'document-downloader'); ?>"
       x-model="query"
@@ -158,7 +188,7 @@ final class Shortcode
     />
     
     <!-- Spinner icon while loading -->
-    <div class="dd__input-icon dd__input-icon--spinner" x-show="loading" x-cloak>
+    <div class="doc-search__input-icon doc-search__input-icon--spinner" x-show="loading" x-cloak>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
         <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="32" stroke-dashoffset="32">
           <animate attributeName="stroke-dasharray" dur="2s" values="0 32;16 16;0 32;0 32" repeatCount="indefinite"/>
@@ -170,7 +200,7 @@ final class Shortcode
     <!-- Clear icon -->
     <button 
       type="button" 
-      class="dd__input-icon dd__input-icon--clear" 
+      class="doc-search__input-icon doc-search__input-icon--clear" 
       x-show="query.length > 0 && !loading" 
       @click="query = ''; results = [];"
       :aria-label="'<?php esc_attr_e('Clear search', 'document-downloader'); ?>'"
@@ -182,57 +212,241 @@ final class Shortcode
     </button>
   </div>
 
-  <div class="dd__statuswrap" aria-live="polite" role="status">
+  <div class="doc-search__statuswrap" aria-live="polite" role="status">
     <template x-if="query.length > 0 && query.length < 3">
-      <p class="dd__status dd__status--hint"><?php esc_html_e('Please type at least 3 characters.', 'document-downloader'); ?></p>
+      <p class="doc-search__status doc-search__status--hint"><?php esc_html_e('Please type at least 3 characters.', 'document-downloader'); ?></p>
     </template>
 
     <template x-if="loading">
-      <p class="dd__status dd__status--loading"><?php esc_html_e('Searching…', 'document-downloader'); ?></p>
+      <p class="doc-search__status doc-search__status--loading"><?php esc_html_e('Searching…', 'document-downloader'); ?></p>
     </template>
 
     <template x-if="error">
-      <p class="dd__status dd__status--error"><?php esc_html_e('Error: check internet connection', 'document-downloader'); ?></p>
+      <p class="doc-search__status doc-search__status--error"><?php esc_html_e('Error: check internet connection', 'document-downloader'); ?></p>
     </template>
 
     <template x-if="!loading && !error && results.length === 0 && query.length >= 3">
-      <p class="dd__status dd__status--empty"><?php esc_html_e('No matching documents.', 'document-downloader'); ?></p>
+      <p class="doc-search__status doc-search__status--empty"><?php esc_html_e('No matching documents.', 'document-downloader'); ?></p>
     </template>
   </div>
 
-  <ul class="dd__list" :class="{ 'dd__list--visible': results.length > 0 }" aria-title="Document List">
+  <ul class="doc-search__list" :class="{ 'doc-search__list--visible': results.length > 0 }" aria-title="Document List">
     <template x-for="item in results" :key="item.id">
-      <li class="dd__item">
+      <li class="doc-search__item">
         <button
           type="button"
-          class="dd__button dd__button--doc"
+          class="doc-search__button doc-search__button--doc"
           :data-ext="item.ext"
           @click="onItemClick(item)"
         >
-          <span class="dd__icon" aria-hidden="true" x-html="iconFor(item.ext)"></span>
-          <span class="dd__title" x-text="item.title"></span>
+          <span class="doc-search__icon" aria-hidden="true" x-html="iconFor(item.ext)"></span>
+          <span class="doc-search__title" x-text="item.title"></span>
         </button>
       </li>
     </template>
   </ul>
 
-  <dialog x-ref="dlg" class="dd__dialog" @click.self="$refs.dlg.close()">
-    <button type="button" class="dd__dialog-close" @click="$refs.dlg.close()" aria-label="<?php esc_attr_e('Close', 'document-downloader'); ?>">✕</button>
-    <form method="dialog" class="dd__dialog-form" @submit.prevent="submitEmailAndDownload()">
-      <h3 class="dd__dialog-title"><?php esc_html_e('Enter your Email Address to download', 'document-downloader'); ?></h3>
-      <p class="dd__dialog-file" x-text="pendingFileName"></p>
+  <dialog x-ref="dlg" class="doc-search__dialog" @click.self="$refs.dlg.close()">
+    <button type="button" class="doc-search__dialog-close" @click="$refs.dlg.close()" aria-label="<?php esc_attr_e('Close', 'document-downloader'); ?>">✕</button>
+    <form method="dialog" class="doc-search__dialog-form" @submit.prevent="submitEmailAndDownload()">
+      <h3 class="doc-search__dialog-title"><?php esc_html_e('Enter your details to download', 'document-downloader'); ?></h3>
+      <p class="doc-search__dialog-file" x-text="pendingFileName"></p>
 
-      <label class="dd__field">
-        <span class="dd__field-label"><?php esc_html_e('Email address', 'document-downloader'); ?></span>
-        <input type="email" class="dd__field-input" x-model="email" required @input="validateEmail()" placeholder="name@example.com" />
+      <label class="doc-search__field" x-show="requireName" :class="nameInvalid ? 'doc-search__field--invalid' : (name && name.length > 0 && !nameInvalid ? 'doc-search__field--valid' : '')">
+        <span class="doc-search__field-label">
+          <?php esc_html_e('Name', 'document-downloader'); ?> 
+          <span class="doc-search__field-required" x-show="requireName">*</span>
+        </span>
+        <input type="text" class="doc-search__field-input" x-model="name" :required="requireName" @input="validateForm()" @blur="validateForm()" placeholder="Your name" />
+        <span class="doc-search__field-message" x-show="requireName && nameInvalid" x-text="nameMessage"></span>
+      </label>
+      
+      <label class="doc-search__field" x-show="requireEmail" :class="emailInvalid ? 'doc-search__field--invalid' : (email && email.length > 0 && !emailInvalid ? 'doc-search__field--valid' : '')">
+        <span class="doc-search__field-label">
+          <?php esc_html_e('Email address', 'document-downloader'); ?> 
+          <span class="doc-search__field-required" x-show="requireEmail">*</span>
+        </span>
+        <input type="email" class="doc-search__field-input" x-model="email" :required="requireEmail" @input="validateForm()" @blur="validateForm()" placeholder="name@example.com" />
+        <span class="doc-search__field-message" x-show="requireEmail && emailInvalid" x-text="emailMessage"></span>
+      </label>
+      
+      <label class="doc-search__field" x-show="requirePhone" :class="phoneInvalid ? 'doc-search__field--invalid' : (phone && phone.length > 0 && !phoneInvalid ? 'doc-search__field--valid' : '')">
+        <span class="doc-search__field-label">
+          <?php esc_html_e('Phone number', 'document-downloader'); ?> 
+          <span class="doc-search__field-required" x-show="requirePhone">*</span>
+        </span>
+        <input type="tel" class="doc-search__field-input" x-model="phone" :required="requirePhone" @input="validateForm()" @blur="validateForm()" placeholder="Your phone number" />
+        <span class="doc-search__field-message" x-show="requirePhone && phoneInvalid" x-text="phoneMessage"></span>
       </label>
 
-      <div class="dd__actions">
-        <button type="submit" class="dd__btn dd__btn--primary" :disabled="!emailValid || downloading">
+      <div class="doc-search__actions">
+        <button type="submit" class="doc-search__btn doc-search__btn--primary" :disabled="!formValid || downloading">
           <span x-show="!downloading"><?php esc_html_e('Download', 'document-downloader'); ?></span>
           <span x-show="downloading"><?php esc_html_e('Working…', 'document-downloader'); ?></span>
         </button>
-        <button type="button" class="dd__btn" @click="$refs.dlg.close()"><?php esc_html_e('Cancel', 'document-downloader'); ?></button>
+        <button type="button" class="doc-search__btn" @click="$refs.dlg.close()"><?php esc_html_e('Cancel', 'document-downloader'); ?></button>
+      </div>
+    </form>
+  </dialog>
+</div>
+<?php
+        return ob_get_clean();
+    }
+
+    public static function render_list($atts = [], $content = ''): string
+    {
+        // Scripts / styles
+        wp_enqueue_script('doc-search-alpine-list');
+        $opts = Settings::get_options();
+        if (empty($opts['disable_alpine'])) {
+            if (wp_script_is('alpine', 'registered')) wp_enqueue_script('alpine');
+            else wp_enqueue_script('alpinejs');
+        }
+        wp_enqueue_style('doc-search-frontend');
+
+        // Parse attributes
+        $atts = shortcode_atts(['tax' => ''], $atts);
+        $tax_param = trim($atts['tax']);
+
+        // Get taxonomy filter
+        $tax_slugs = [];
+        if ($tax_param !== '') {
+            $raw = array_map('trim', explode(',', $tax_param));
+            foreach ($raw as $slug) {
+                if ($slug && term_exists($slug, CPT::TAXONOMY)) {
+                    $tax_slugs[] = $slug;
+                }
+            }
+        }
+
+        // Build endpoints
+        $endpoint = rest_url('document-downloader/v1/query');
+        $log_endpoint = rest_url('document-downloader/v1/log');
+
+        $plural = strtolower($opts['plural']);
+        $tax_json_attr = esc_attr(wp_json_encode($tax_slugs));
+
+        ob_start(); ?>
+<div
+  class="doc-search doc-search-list"
+  x-data="docSearchList('<?php echo esc_url($endpoint); ?>')"
+  x-init="initFromData($el); loadAllDocuments()"
+  data-doc-search-tax="<?php echo $tax_json_attr; ?>"
+>
+
+  <label class="doc-search__label" for="doc-search-list-input">
+    <?php echo esc_html( sprintf( __('Filter %s', 'document-downloader'), $plural ) ); ?>
+  </label>
+
+  <div class="doc-search__input-wrapper">
+    <input
+      id="doc-search-list-input"
+      class="doc-search__input"
+      type="search"
+      placeholder="<?php esc_attr_e('Filter documents…', 'document-downloader'); ?>"
+      x-model="query"
+      @input="debouncedFilter()"
+      autocomplete="off"
+    />
+    
+    <div class="doc-search__input-icon doc-search__input-icon--spinner" x-show="loading" x-cloak>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="32" stroke-dashoffset="32">
+          <animate attributeName="stroke-dasharray" dur="2s" values="0 32;16 16;0 32;0 32" repeatCount="indefinite"/>
+          <animate attributeName="stroke-dashoffset" dur="2s" values="0;-16;-32;-48" repeatCount="indefinite"/>
+        </circle>
+      </svg>
+    </div>
+
+    <button 
+      type="button"
+      class="doc-search__input-icon doc-search__input-icon--clear" 
+      x-show="query.length > 0 && !loading" 
+      @click="query = ''; filterDocuments();"
+      :aria-label="'<?php esc_attr_e('Clear filter', 'document-downloader'); ?>'"
+      x-cloak
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 6L6 18M6 6l12 12"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="doc-search__statuswrap" aria-live="polite" role="status">
+    <template x-if="loading">
+      <p class="doc-search__status doc-search__status--loading"><?php esc_html_e('Loading documents…', 'document-downloader'); ?></p>
+    </template>
+
+    <template x-if="error">
+      <p class="doc-search__status doc-search__status--error"><?php esc_html_e('Error loading documents', 'document-downloader'); ?></p>
+    </template>
+
+    <template x-if="!loading && !error && filteredResults.length === 0 && allDocuments.length > 0">
+      <p class="doc-search__status doc-search__status--empty"><?php esc_html_e('No documents match your filter.', 'document-downloader'); ?></p>
+    </template>
+
+    <template x-if="!loading && !error && allDocuments.length === 0">
+      <p class="doc-search__status doc-search__status--empty"><?php esc_html_e('No documents found.', 'document-downloader'); ?></p>
+    </template>
+  </div>
+
+  <div class="doc-search__list-container">
+    <ul class="doc-search__list doc-search__list--static" x-show="filteredResults.length > 0" aria-title="Document List">
+      <template x-for="item in filteredResults" :key="item.id">
+        <li class="doc-search__item">
+          <button
+            type="button"
+            class="doc-search__button doc-search__button--doc"
+            :data-ext="item.ext"
+            @click="onItemClick(item)"
+          >
+            <span class="doc-search__icon" aria-hidden="true" x-html="iconFor(item.ext)"></span>
+            <span class="doc-search__title" x-text="item.title"></span>
+          </button>
+        </li>
+      </template>
+    </ul>
+  </div>
+
+  <dialog x-ref="dlg" class="doc-search__dialog" @click.self="$refs.dlg.close()">
+    <button type="button" class="doc-search__dialog-close" @click="$refs.dlg.close()" aria-label="<?php esc_attr_e('Close', 'document-downloader'); ?>">✕</button>
+    <form method="dialog" class="doc-search__dialog-form" @submit.prevent="submitEmailAndDownload()">
+      <h3 class="doc-search__dialog-title"><?php esc_html_e('Enter your details to download', 'document-downloader'); ?></h3>
+      <p class="doc-search__dialog-file" x-text="pendingFileName"></p>
+
+      <label class="doc-search__field" x-show="requireName" :class="nameInvalid ? 'doc-search__field--invalid' : (name && name.length > 0 && !nameInvalid ? 'doc-search__field--valid' : '')">
+        <span class="doc-search__field-label">
+          <?php esc_html_e('Name', 'document-downloader'); ?> 
+          <span class="doc-search__field-required" x-show="requireName">*</span>
+        </span>
+        <input type="text" class="doc-search__field-input" x-model="name" :required="requireName" @input="validateForm()" @blur="validateForm()" placeholder="Your name" />
+        <span class="doc-search__field-message" x-show="requireName && nameInvalid" x-text="nameMessage"></span>
+      </label>
+      
+      <label class="doc-search__field" x-show="requireEmail" :class="emailInvalid ? 'doc-search__field--invalid' : (email && email.length > 0 && !emailInvalid ? 'doc-search__field--valid' : '')">
+        <span class="doc-search__field-label">
+          <?php esc_html_e('Email address', 'document-downloader'); ?> 
+          <span class="doc-search__field-required" x-show="requireEmail">*</span>
+        </span>
+        <input type="email" class="doc-search__field-input" x-model="email" :required="requireEmail" @input="validateForm()" @blur="validateForm()" placeholder="name@example.com" />
+        <span class="doc-search__field-message" x-show="requireEmail && emailInvalid" x-text="emailMessage"></span>
+      </label>
+      
+      <label class="doc-search__field" x-show="requirePhone" :class="phoneInvalid ? 'doc-search__field--invalid' : (phone && phone.length > 0 && !phoneInvalid ? 'doc-search__field--valid' : '')">
+        <span class="doc-search__field-label">
+          <?php esc_html_e('Phone number', 'document-downloader'); ?> 
+          <span class="doc-search__field-required" x-show="requirePhone">*</span>
+        </span>
+        <input type="tel" class="doc-search__field-input" x-model="phone" :required="requirePhone" @input="validateForm()" @blur="validateForm()" placeholder="Your phone number" />
+        <span class="doc-search__field-message" x-show="requirePhone && phoneInvalid" x-text="phoneMessage"></span>
+      </label>
+
+      <div class="doc-search__actions">
+        <button type="submit" class="doc-search__btn doc-search__btn--primary" :disabled="!formValid || downloading">
+          <span x-show="!downloading"><?php esc_html_e('Download', 'document-downloader'); ?></span>
+          <span x-show="downloading"><?php esc_html_e('Working…', 'document-downloader'); ?></span>
+        </button>
+        <button type="button" class="doc-search__btn" @click="$refs.dlg.close()"><?php esc_html_e('Cancel', 'document-downloader'); ?></button>
       </div>
     </form>
   </dialog>

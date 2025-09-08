@@ -38,16 +38,16 @@ final class Meta
 
     public static function render_metabox(\WP_Post $post): void
     {
-        wp_nonce_field('dd_meta', 'dd_meta_nonce');
+        wp_nonce_field('doc_search_meta', 'doc_search_meta_nonce');
         $att_id = (int) get_post_meta($post->ID, DD_META_KEY, true);
         $url    = $att_id ? wp_get_attachment_url($att_id) : '';
 
         // UI: Select/Remove buttons and preview URL
         ?>
-        <div id="dd-file-picker" style="margin: .5rem 0 0;">
+        <div id="doc-search-file-picker" style="margin: .5rem 0 0;">
             <p>
-                <button type="button" class="button" id="dd-select"><?php esc_html_e('Select File', 'document-downloader'); ?></button>
-                <button type="button" class="button" id="dd-remove" <?php disabled(!$att_id); ?>><?php esc_html_e('Remove', 'document-downloader'); ?></button>
+                <button type="button" class="button" id="doc-search-select"><?php esc_html_e('Select File', 'document-downloader'); ?></button>
+                <button type="button" class="button" id="doc-search-remove" <?php disabled(!$att_id); ?>><?php esc_html_e('Remove', 'document-downloader'); ?></button>
             </p>
             <?php if ($url): ?>
                 <p><a href="<?php echo esc_url($url); ?>" target="_blank" rel="noopener"><?php echo esc_html($url); ?></a></p>
@@ -57,6 +57,11 @@ final class Meta
         <script>
         (function($){
           $(function(){
+            console.log('Document uploader initializing...');
+            if (typeof wp === 'undefined' || typeof wp.media === 'undefined') {
+              console.error('wp.media is not available');
+              return;
+            }
             const frame = wp.media({
               title: '<?php echo esc_js(__('Select a file', 'document-downloader')); ?>',
               multiple: false,
@@ -74,23 +79,26 @@ final class Meta
                 ]
               }
             });
-            $('#dd-select').on('click', function(e){
+            $('#doc-search-select').on('click', function(e){
+              console.log('Select file button clicked');
               e.preventDefault();
               frame.open();
             });
             frame.on('select', function(){
+              console.log('File selected from media library');
               const file = frame.state().get('selection').first().toJSON();
-              $('#dd-remove').prop('disabled', false);
-              $('#dd-file-picker').find('p a').remove();
-              $('#dd-file-picker').append('<p><a href="'+file.url+'" target="_blank" rel="noopener">'+file.url+'</a></p>');
-              $('<input/>',{type:'hidden',name:'dd_file_id',value:file.id}).appendTo('#dd-file-picker');
+              console.log('Selected file:', file);
+              $('#doc-search-remove').prop('disabled', false);
+              $('#doc-search-file-picker').find('p a').remove();
+              $('#doc-search-file-picker').append('<p><a href="'+file.url+'" target="_blank" rel="noopener">'+file.url+'</a></p>');
+              $('<input/>',{type:'hidden',name:'doc_search_file_id',value:file.id}).appendTo('#doc-search-file-picker');
             });
-            $('#dd-remove').on('click', function(e){
+            $('#doc-search-remove').on('click', function(e){
               e.preventDefault();
-              $('#dd-file-picker').find('input[name="dd_file_id"]').remove();
+              $('#doc-search-file-picker').find('input[name="doc_search_file_id"]').remove();
               $(this).prop('disabled', true);
-              $('#dd-file-picker').find('p a').remove();
-              $('<input/>',{type:'hidden',name:'dd_file_remove',value:'1'}).appendTo('#dd-file-picker');
+              $('#doc-search-file-picker').find('p a').remove();
+              $('<input/>',{type:'hidden',name:'doc_search_file_remove',value:'1'}).appendTo('#doc-search-file-picker');
             });
           });
         })(jQuery);
@@ -100,17 +108,17 @@ final class Meta
 
     public static function save(int $post_id, \WP_Post $post): void
     {
-        if (!isset($_POST['dd_meta_nonce']) || !wp_verify_nonce($_POST['dd_meta_nonce'], 'dd_meta')) return;
+        if (!isset($_POST['doc_search_meta_nonce']) || !wp_verify_nonce($_POST['doc_search_meta_nonce'], 'doc_search_meta')) return;
         if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
         if (!current_user_can('edit_post', $post_id)) return;
 
-        if (isset($_POST['dd_file_remove'])) {
+        if (isset($_POST['doc_search_file_remove'])) {
             delete_post_meta($post_id, DD_META_KEY);
             return;
         }
 
-        if (isset($_POST['dd_file_id'])) {
-            $att_id = (int) $_POST['dd_file_id'];
+        if (isset($_POST['doc_search_file_id'])) {
+            $att_id = (int) $_POST['doc_search_file_id'];
             if ($att_id > 0) {
                 update_post_meta($post_id, DD_META_KEY, $att_id);
             }

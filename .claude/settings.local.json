@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(composer:*)"
+      "Bash(composer:*)",
+      "Read(//c/Users/Alan.Blair/Downloads/**)",
+      "Bash(sed:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
