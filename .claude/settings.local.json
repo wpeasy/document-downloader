@@ -7,7 +7,9 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(zip:*)"
+      "Bash(zip:*)",
+      "Bash(powershell:*)",
+      "Read(//c/Users/Alan.Blair/.claude/commands/**)"
     ],
     "deny": [],
     "ask": []
