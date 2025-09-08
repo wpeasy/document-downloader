@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.5(beta)] - 2025-09-08
+
+### Fixed
+- Downloads admin page reset button now properly clears filters and stays on downloads page instead of redirecting to CPT list page
+- Fixed URL generation for downloads admin page actions (reset, export, clear log)
+
 ## [1.0.4(beta)] - 2025-09-08
 
 ### Added

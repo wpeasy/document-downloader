@@ -119,7 +119,7 @@ final class Admin_Downloads
         $rows = $args ? $wpdb->get_results($wpdb->prepare($sql, $args), ARRAY_A) : $wpdb->get_results($sql, ARRAY_A);
 
         // Build export URL with current filters + nonce
-        $base_url = menu_page_url('doc_search_downloads', false);
+        $base_url = admin_url('edit.php?post_type=' . CPT::POST_TYPE . '&page=doc_search_downloads');
         $query    = array_filter([
             'page'       => 'doc_search_downloads',
             'file_name'  => $file_name,
