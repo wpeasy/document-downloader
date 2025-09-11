@@ -9,7 +9,7 @@ final class Settings
 
     public static function init(): void
     {
-        add_action('admin_menu', [__CLASS__, 'menu']);
+        add_action('admin_menu', [__CLASS__, 'menu'], 100); // Load last
         add_action('admin_init', [__CLASS__, 'register']);
         add_action('admin_enqueue_scripts', [__CLASS__, 'maybe_enqueue_assets']);
         add_action('wp_ajax_dd_test_schedule_notification', [__CLASS__, 'handle_test_schedule_notification']);
@@ -333,7 +333,8 @@ CSS;
             __('Settings', 'document-downloader'),
             'manage_options',
             'dd_document_settings',
-            [__CLASS__, 'render']
+            [__CLASS__, 'render'],
+            99 // Position at bottom
         );
     }
 

@@ -13,7 +13,7 @@ final class Admin_Downloads
 
     public static function init(): void
     {
-        add_action('admin_menu', [__CLASS__, 'menu']);
+        add_action('admin_menu', [__CLASS__, 'menu'], 20);
     }
 
     public static function menu(): void
@@ -24,7 +24,8 @@ final class Admin_Downloads
             __('Downloads', 'document-address-search'),
             'edit_posts',
             'doc_search_downloads',
-            [__CLASS__, 'render']
+            [__CLASS__, 'render'],
+            10 // First position
         );
 
         // Handle actions before admin page renders to avoid "headers already sent"

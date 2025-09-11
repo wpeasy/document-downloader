@@ -2,7 +2,7 @@
 /**
  * Plugin Name:  Document Downloader
  * Description:  Document Download Manager
- * Version:      1.0.7(beta)
+ * Version:      1.0.8(beta)
  * Requires PHP: 7.4
  * Author:       Alan Blair<alan@wpeasy.au>
  * Text Domain:  document-downloader

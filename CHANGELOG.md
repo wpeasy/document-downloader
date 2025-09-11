@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.8(beta)] - 2025-09-10
+
+### Fixed
+- Admin menu ordering: Settings menu now appears at the bottom after Downloads and Instructions
+
 ## [1.0.7(beta)] - 2025-09-10
 
 ### Added

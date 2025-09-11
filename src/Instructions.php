@@ -7,7 +7,7 @@ final class Instructions
 {
     public static function init(): void
     {
-        add_action('admin_menu', [__CLASS__, 'menu']);
+        add_action('admin_menu', [__CLASS__, 'menu'], 30);
     }
 
     public static function menu(): void
@@ -18,7 +18,8 @@ final class Instructions
             __('Instructions', 'document-downloader'),
             'edit_posts',
             'doc_search_instructions',
-            [__CLASS__, 'render']
+            [__CLASS__, 'render'],
+            20 // Middle position
         );
     }
 
