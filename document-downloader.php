@@ -2,7 +2,7 @@
 /**
  * Plugin Name:  Document Downloader
  * Description:  Document Download Manager
- * Version:      1.0.6(beta)
+ * Version:      1.0.7(beta)
  * Requires PHP: 7.4
  * Author:       Alan Blair<alan@wpeasy.au>
  * Text Domain:  document-downloader
@@ -26,13 +26,14 @@ if (file_exists(__DIR__ . '/vendor/autoload.php')) {
 add_action('plugins_loaded', static function () {
     load_plugin_textdomain('document-downloader', false, dirname(plugin_basename(__FILE__)) . '/languages');
 
-    WP_Easy\DocumentDownloader\CPT::init();              // CPT + taxonomy
-    WP_Easy\DocumentDownloader\Meta::init();             // Meta field under title
-    WP_Easy\DocumentDownloader\Settings::init();         // Settings (tabs + CSS editor)
-    WP_Easy\DocumentDownloader\Shortcode::init();        // Shortcode + assets
-    WP_Easy\DocumentDownloader\REST_API::init();         // Endpoints
-    WP_Easy\DocumentDownloader\Admin_Downloads::init();  // Downloads admin
-    WP_Easy\DocumentDownloader\Instructions::init();     // Instructions page
+    WP_Easy\DocumentDownloader\CPT::init();                     // CPT + taxonomy
+    WP_Easy\DocumentDownloader\Meta::init();                    // Meta field under title
+    WP_Easy\DocumentDownloader\Settings::init();                // Settings (tabs + CSS editor)
+    WP_Easy\DocumentDownloader\Shortcode::init();               // Shortcode + assets
+    WP_Easy\DocumentDownloader\REST_API::init();                // Endpoints
+    WP_Easy\DocumentDownloader\Admin_Downloads::init();         // Downloads admin
+    WP_Easy\DocumentDownloader\Instructions::init();            // Instructions page
+    WP_Easy\DocumentDownloader\Scheduled_Notifications::init(); // Scheduled email reports
 });
 
 // Ensure uploads/documents exists

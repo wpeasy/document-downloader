@@ -25,6 +25,12 @@ final class Instructions
     public static function render(): void
     {
         ?>
+        <style>
+            .wrap .card {
+                max-width: 1600px !important;
+                width: 100%;
+            }
+        </style>
         <div class="wrap">
             <h1><?php esc_html_e('Document Downloader Instructions', 'document-downloader'); ?></h1>
             

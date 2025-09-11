@@ -268,13 +268,13 @@ final class REST_API
     }
 
     /**
-     * Send notification email if notify_email setting is enabled
+     * Send notification email if notify_individually setting is enabled
      */
     private static function maybe_send_notification(string $title, string $filename, string $email, string $name, string $phone, string $url): void
     {
         $opts = Settings::get_options();
         
-        if (empty($opts['notify_email']) || empty($opts['notification_email'])) {
+        if (empty($opts['notify_individually']) || empty($opts['notification_email'])) {
             return;
         }
         
@@ -380,9 +380,9 @@ final class REST_API
         $max_iterations = 10; // Prevent infinite loops
         $iteration = 0;
         
-        while ($iteration < $max_iterations && preg_match('/\{\?([^:}]+):(.*?)\}(?=\s|$|<|{|\})/s', $processed)) {
+        while ($iteration < $max_iterations && preg_match('/\{\?([^:}]+):([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/s', $processed)) {
             $processed = preg_replace_callback(
-                '/\{\?([^:}]+):(.*?)\}(?=\s|$|<|{|\})/s',
+                '/\{\?([^:}]+):([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/s',
                 function ($matches) use ($placeholders) {
                     $condition = trim($matches[1]);
                     $content = $matches[2];

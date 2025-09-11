@@ -12,6 +12,7 @@ final class Settings
         add_action('admin_menu', [__CLASS__, 'menu']);
         add_action('admin_init', [__CLASS__, 'register']);
         add_action('admin_enqueue_scripts', [__CLASS__, 'maybe_enqueue_assets']);
+        add_action('wp_ajax_dd_test_schedule_notification', [__CLASS__, 'handle_test_schedule_notification']);
     }
 
     /** Defaults */
@@ -24,8 +25,10 @@ final class Settings
             'require_email'       => 0,
             'require_name'        => 0,
             'require_phone'       => 0,
-            'notify_email'        => 0,
+            'notify_individually' => 0,
+            'notify_schedule'     => 0,
             'notification_email'  => '',
+            'notification_schedule' => 'daily',
             'notification_subject' => '{file_name} downloaded',
             'notification_message' => self::default_notification_message(),
             'excluded_search_text' => '',
@@ -38,13 +41,16 @@ final class Settings
     {
         return <<<HTML
 <h2>Document Downloaded</h2>
-A document has been downloaded from your website.<br><br>
+A document has been downloaded from your website.
 
-<strong>Document:</strong> {file_name}<br><br>
-{?name:<strong>Downloaded by:</strong> {name}{?email: &lt;{email}&gt;}<br><br>}
-{?email!name:<strong>Email:</strong> {email}<br><br>}
+{date}
+
+{?name:<strong>Name:</strong> {name}<br><br>}
+{?email:<strong>Email:</strong> {email}<br><br>}
 {?phone:<strong>Phone:</strong> {phone}<br><br>}
-<strong>Date:</strong> {date}<br>
+{?title:<strong>Document:</strong> {title}<br><br>}
+{?file_name:<strong>File:</strong> {file_name}}
+
 <strong>URL:</strong> {url}
 HTML;
     }
@@ -278,6 +284,13 @@ CSS;
         $opt = get_option(self::OPTION);
         if (!is_array($opt)) $opt = [];
         $opt = wp_parse_args($opt, self::defaults());
+        
+        // Migrate old notify_email setting to notify_individually
+        if (isset($opt['notify_email']) && !isset($opt['notify_individually'])) {
+            $opt['notify_individually'] = $opt['notify_email'];
+            unset($opt['notify_email']);
+            update_option(self::OPTION, $opt);
+        }
 
         $out = [
             'plural'              => trim((string)$opt['plural']),
@@ -286,8 +299,10 @@ CSS;
             'require_email'       => (int)!empty($opt['require_email']),
             'require_name'        => (int)!empty($opt['require_name']),
             'require_phone'       => (int)!empty($opt['require_phone']),
-            'notify_email'        => (int)!empty($opt['notify_email']),
+            'notify_individually' => (int)!empty($opt['notify_individually']),
+            'notify_schedule'     => (int)!empty($opt['notify_schedule']),
             'notification_email'  => sanitize_email((string)$opt['notification_email']),
+            'notification_schedule' => in_array($opt['notification_schedule'], ['daily', 'weekly', 'monthly']) ? $opt['notification_schedule'] : 'daily',
             'notification_subject' => trim((string)$opt['notification_subject']),
             'notification_message' => (string)$opt['notification_message'],
             'excluded_search_text' => trim((string)$opt['excluded_search_text']),
@@ -345,8 +360,10 @@ CSS;
             'require_email'       => !empty($value['require_email']) ? 1 : 0,
             'require_name'        => !empty($value['require_name']) ? 1 : 0,
             'require_phone'       => !empty($value['require_phone']) ? 1 : 0,
-            'notify_email'        => !empty($value['notify_email']) ? 1 : 0,
+            'notify_individually' => !empty($value['notify_individually']) ? 1 : 0,
+            'notify_schedule'     => !empty($value['notify_schedule']) ? 1 : 0,
             'notification_email'  => isset($value['notification_email']) ? sanitize_email($value['notification_email']) : '',
+            'notification_schedule' => isset($value['notification_schedule']) && in_array($value['notification_schedule'], ['daily', 'weekly', 'monthly']) ? $value['notification_schedule'] : $d['notification_schedule'],
             'notification_subject' => isset($value['notification_subject']) ? sanitize_text_field($value['notification_subject']) : $d['notification_subject'],
             'notification_message' => isset($value['notification_message']) ? wp_kses_post($value['notification_message']) : $d['notification_message'],
             'excluded_search_text' => isset($value['excluded_search_text']) ? sanitize_textarea_field($value['excluded_search_text']) : $d['excluded_search_text'],
@@ -391,6 +408,20 @@ CSS;
             '<input type="email" class="regular-text" name="%1$s[%2$s]" value="%3$s" placeholder="%4$s" />',
             esc_attr(self::OPTION), esc_attr($name), esc_attr($value), esc_attr($placeholder)
         );
+    }
+
+    private static function field_select(string $name, string $value, array $options): void
+    {
+        printf('<select name="%1$s[%2$s]">', esc_attr(self::OPTION), esc_attr($name));
+        foreach ($options as $option_value => $option_label) {
+            printf(
+                '<option value="%1$s"%2$s>%3$s</option>',
+                esc_attr($option_value),
+                selected($value, $option_value, false),
+                esc_html($option_label)
+            );
+        }
+        echo '</select>';
     }
 
     public static function render(): void
@@ -457,17 +488,34 @@ CSS;
                         <table class="form-table" role="presentation">
                             <tbody>
                                 <tr>
-                                    <th scope="row"><?php esc_html_e('Notify by email', 'document-downloader'); ?></th>
-                                    <td><?php self::field_checkbox('notify_email', (int)$opt['notify_email'], __('Send email notification when documents are downloaded.', 'document-downloader')); ?></td>
+                                    <th scope="row"><?php esc_html_e('Notify Individually', 'document-downloader'); ?></th>
+                                    <td><?php self::field_checkbox('notify_individually', (int)$opt['notify_individually'], __('Send email notification when documents are downloaded.', 'document-downloader')); ?></td>
                                 </tr>
-                                <tr id="doc-search-notify-row" <?php echo $opt['notify_email'] ? '' : 'style="display:none"'; ?>>
+                                <tr>
+                                    <th scope="row"><?php esc_html_e('Notify on Schedule', 'document-downloader'); ?></th>
+                                    <td><?php self::field_checkbox('notify_schedule', (int)$opt['notify_schedule'], __('Send scheduled email reports with download statistics.', 'document-downloader')); ?></td>
+                                </tr>
+                                <tr id="doc-search-notify-email-row" <?php echo ($opt['notify_individually'] || $opt['notify_schedule']) ? '' : 'style="display:none"'; ?>>
                                     <th scope="row"><label for="doc-search-notify-email"><?php esc_html_e('Notification Email Address', 'document-downloader'); ?></label></th>
                                     <td><?php self::field_email('notification_email', $opt['notification_email'], 'name@example.com'); ?></td>
+                                </tr>
+                                <tr id="doc-search-notify-schedule-row" <?php echo $opt['notify_schedule'] ? '' : 'style="display:none"'; ?>>
+                                    <th scope="row"><label for="doc-search-schedule"><?php esc_html_e('Schedule Frequency', 'document-downloader'); ?></label></th>
+                                    <td><?php 
+                                        self::field_select('notification_schedule', $opt['notification_schedule'], [
+                                            'daily' => __('Daily', 'document-downloader'),
+                                            'weekly' => __('Weekly', 'document-downloader'), 
+                                            'monthly' => __('Monthly', 'document-downloader')
+                                        ]); 
+                                    ?>
+                                    <button type="button" id="doc-search-test-schedule" class="button button-secondary" style="margin-left: 10px;"><?php esc_html_e('Test', 'document-downloader'); ?></button>
+                                    <span id="doc-search-test-result" style="margin-left: 10px; font-style: italic;"></span>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
                         
-                        <div id="doc-search-notification-fields" <?php echo $opt['notify_email'] ? '' : 'style="display:none"'; ?>>
+                        <div id="doc-search-notification-fields" <?php echo ($opt['notify_individually'] || $opt['notify_schedule']) ? '' : 'style="display:none"'; ?>>
                             <hr style="margin: 20px 0;">
                             
                             <h3><?php esc_html_e('Email Template', 'document-downloader'); ?></h3>
@@ -620,14 +668,73 @@ CSS;
           selectTab(initial);
 
           // Toggle notification email row and fields
-          const notify = document.querySelector('input[name="<?php echo esc_js(self::OPTION); ?>[notify_email]"]');
-          const row = document.getElementById('doc-search-notify-row');
+          const notifyIndividual = document.querySelector('input[name="<?php echo esc_js(self::OPTION); ?>[notify_individually]"]');
+          const notifySchedule = document.querySelector('input[name="<?php echo esc_js(self::OPTION); ?>[notify_schedule]"]');
+          const emailRow = document.getElementById('doc-search-notify-email-row');
+          const scheduleRow = document.getElementById('doc-search-notify-schedule-row');
           const fields = document.getElementById('doc-search-notification-fields');
-          if (notify && row) {
-            notify.addEventListener('change', () => { 
-              const display = notify.checked ? '' : 'none';
-              row.style.display = display;
-              if (fields) fields.style.display = display;
+          
+          const toggleEmailVisibility = () => {
+            const showEmail = (notifyIndividual && notifyIndividual.checked) || (notifySchedule && notifySchedule.checked);
+            const showTemplate = (notifyIndividual && notifyIndividual.checked) || (notifySchedule && notifySchedule.checked);
+            if (emailRow) emailRow.style.display = showEmail ? '' : 'none';
+            if (fields) fields.style.display = showTemplate ? '' : 'none';
+          };
+          
+          const toggleScheduleVisibility = () => {
+            if (scheduleRow) scheduleRow.style.display = (notifySchedule && notifySchedule.checked) ? '' : 'none';
+          };
+          
+          if (notifyIndividual) {
+            notifyIndividual.addEventListener('change', toggleEmailVisibility);
+          }
+          if (notifySchedule) {
+            notifySchedule.addEventListener('change', () => {
+              toggleEmailVisibility();
+              toggleScheduleVisibility();
+            });
+          }
+          
+          // Test schedule notification functionality
+          const testButton = document.getElementById('doc-search-test-schedule');
+          const testResult = document.getElementById('doc-search-test-result');
+          
+          if (testButton) {
+            testButton.addEventListener('click', function() {
+              testButton.disabled = true;
+              testButton.textContent = '<?php echo esc_js(__('Testing...', 'document-downloader')); ?>';
+              testResult.textContent = '';
+              
+              fetch(ajaxurl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                  action: 'dd_test_schedule_notification',
+                  nonce: '<?php echo wp_create_nonce('dd_test_schedule'); ?>'
+                })
+              })
+              .then(response => response.json())
+              .then(data => {
+                testButton.disabled = false;
+                testButton.textContent = '<?php echo esc_js(__('Test', 'document-downloader')); ?>';
+                
+                if (data.success) {
+                  testResult.textContent = '<?php echo esc_js(__('Test email sent successfully!', 'document-downloader')); ?>';
+                  testResult.style.color = 'green';
+                } else {
+                  testResult.textContent = data.data || '<?php echo esc_js(__('Test failed. Please check settings.', 'document-downloader')); ?>';
+                  testResult.style.color = 'red';
+                }
+                
+                setTimeout(() => { testResult.textContent = ''; }, 5000);
+              })
+              .catch(error => {
+                testButton.disabled = false;
+                testButton.textContent = '<?php echo esc_js(__('Test', 'document-downloader')); ?>';
+                testResult.textContent = '<?php echo esc_js(__('Error sending test email.', 'document-downloader')); ?>';
+                testResult.style.color = 'red';
+                setTimeout(() => { testResult.textContent = ''; }, 5000);
+              });
             });
           }
           
@@ -734,5 +841,106 @@ CSS;
         });
         </script>
         <?php
+    }
+
+    /**
+     * Handle AJAX request to test scheduled notification
+     */
+    public static function handle_test_schedule_notification(): void
+    {
+        // Verify nonce
+        if (!wp_verify_nonce($_POST['nonce'] ?? '', 'dd_test_schedule')) {
+            wp_die('Security check failed');
+        }
+
+        // Check permissions
+        if (!current_user_can('manage_options')) {
+            wp_die('Insufficient permissions');
+        }
+
+        $opts = self::get_options();
+        
+        // Check if notification email is configured
+        if (empty($opts['notification_email'])) {
+            wp_send_json_error(__('No notification email address configured.', 'document-downloader'));
+        }
+
+        // Get the selected frequency for the test
+        $frequency = $opts['notification_schedule'];
+        
+        // Create test data - simulate a recent download for the test
+        $test_download = [
+            'downloaded_at' => wp_date('Y-m-d H:i:s'),
+            'file_name' => 'sample-document.pdf',
+            'title' => 'Sample Document',
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+            'phone' => '+1234567890',
+            'ip_address' => '127.0.0.1',
+            'user_agent' => 'Test Browser'
+        ];
+
+        // Generate test CSV
+        $upload_dir = wp_upload_dir();
+        $temp_dir = $upload_dir['basedir'] . '/temp';
+        wp_mkdir_p($temp_dir);
+        
+        $filename = "test-download-report-{$frequency}-" . wp_date('Y-m-d-H-i-s') . '.csv';
+        $filepath = $temp_dir . '/' . $filename;
+        
+        $file = fopen($filepath, 'w');
+        if (!$file) {
+            wp_send_json_error(__('Failed to create test CSV file.', 'document-downloader'));
+        }
+        
+        // CSV headers
+        fputcsv($file, [
+            'Downloaded At', 'File Name', 'Document Title', 
+            'User Name', 'Email', 'Phone', 'IP Address', 'User Agent'
+        ]);
+        
+        // Add test data row
+        fputcsv($file, [
+            $test_download['downloaded_at'],
+            $test_download['file_name'],
+            $test_download['title'],
+            $test_download['name'],
+            $test_download['email'],
+            $test_download['phone'],
+            $test_download['ip_address'],
+            $test_download['user_agent']
+        ]);
+        
+        fclose($file);
+
+        // Prepare test email - use simple subject without placeholders
+        $to = $opts['notification_email'];
+        $subject = "Document Download {$frequency} Report (TEST) - " . wp_date('Y-m-d');
+        
+        $message = "
+        <h2>TEST - Document Download {$frequency} Report</h2>
+        <p><strong>This is a test email for your scheduled notification settings.</strong></p>
+        <p><strong>Period:</strong> Sample period</p>
+        <p><strong>Total Downloads:</strong> 1 (test data)</p>
+        <p>Please find the test report attached as a CSV file.</p>
+        <hr>
+        <p><em>This is a test email from your Document Downloader plugin.</em></p>
+        ";
+
+        $headers = ['Content-Type: text/html; charset=UTF-8'];
+
+        // Send test email
+        $sent = wp_mail($to, $subject, $message, $headers, [$filepath]);
+        
+        // Clean up test file
+        if (file_exists($filepath)) {
+            unlink($filepath);
+        }
+
+        if ($sent) {
+            wp_send_json_success(__('Test email sent successfully!', 'document-downloader'));
+        } else {
+            wp_send_json_error(__('Failed to send test email. Please check your email settings.', 'document-downloader'));
+        }
     }
 }

@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.7(beta)] - 2025-09-10
+
+### Added
+- Scheduled email notifications with daily, weekly, and monthly frequency options
+- CSV report generation and attachment for scheduled notifications  
+- Test button for scheduled notifications with immediate test email functionality
+- Improved notification settings UI with separate options for individual and scheduled notifications
+
+### Changed
+- Updated notification settings from single "Notify by email" to separate "Notify Individually" and "Notify on Schedule" options
+- Email Template section now shows when either notification type is enabled
+- Instructions page boxes made twice as wide for better readability
+- Default email template updated with improved conditional placeholder format
+
+### Fixed
+- Email template conditional placeholder processing now properly handles nested braces and complex content
+- Scheduled email subjects no longer use confusing individual placeholders, now use clean date-based subjects
+- Tab functionality in settings restored after JavaScript escaping issues
+
 ## [1.0.6(beta)] - 2025-09-08
 
 ### Confirmed
