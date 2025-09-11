@@ -15,7 +15,7 @@ final class Shortcode
 
     public static function assets(): void
     {
-        // Component JS
+        // Component JS - load in head without defer to ensure they're available before Alpine
         wp_register_script(
             'doc-search-alpine-search',
             DD_PLUGIN_URL . 'assets/js/doc-search-alpine-search.js',
@@ -23,9 +23,6 @@ final class Shortcode
             '2.0.3',
             false
         );
-        if (function_exists('wp_script_add_data')) {
-            wp_script_add_data('doc-search-alpine-search', 'defer', true);
-        }
 
         wp_register_script(
             'doc-search-alpine-list',
@@ -34,17 +31,14 @@ final class Shortcode
             '2.0.3',
             false
         );
-        if (function_exists('wp_script_add_data')) {
-            wp_script_add_data('doc-search-alpine-list', 'defer', true);
-        }
 
         // Alpine (optional)
         if (! wp_script_is('alpine', 'registered') && ! wp_script_is('alpinejs', 'registered')) {
             wp_register_script(
                 'alpinejs',
-                'https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js',
+                DD_PLUGIN_URL . 'assets/vendor/alpine.min.js',
                 [],
-                null,
+                '3.15.0',
                 false
             );
             if (function_exists('wp_script_add_data')) {
@@ -147,8 +141,19 @@ final class Shortcode
         wp_enqueue_script('doc-search-alpine-search');
         $opts = Settings::get_options();
         if (empty($opts['disable_alpine'])) {
-            if (wp_script_is('alpine', 'registered')) wp_enqueue_script('alpine');
-            else wp_enqueue_script('alpinejs');
+            if (wp_script_is('alpine', 'registered')) {
+                wp_enqueue_script('alpine');
+            } else {
+                // Add dependency to ensure component loads before Alpine
+                global $wp_scripts;
+                if (isset($wp_scripts->registered['alpinejs'])) {
+                    $current_deps = $wp_scripts->registered['alpinejs']->deps;
+                    if (!in_array('doc-search-alpine-search', $current_deps)) {
+                        $wp_scripts->registered['alpinejs']->deps[] = 'doc-search-alpine-search';
+                    }
+                }
+                wp_enqueue_script('alpinejs');
+            }
         }
         wp_enqueue_style('doc-search-frontend');
 
@@ -334,8 +339,19 @@ final class Shortcode
         wp_enqueue_script('doc-search-alpine-list');
         $opts = Settings::get_options();
         if (empty($opts['disable_alpine'])) {
-            if (wp_script_is('alpine', 'registered')) wp_enqueue_script('alpine');
-            else wp_enqueue_script('alpinejs');
+            if (wp_script_is('alpine', 'registered')) {
+                wp_enqueue_script('alpine');
+            } else {
+                // Add dependency to ensure component loads before Alpine
+                global $wp_scripts;
+                if (isset($wp_scripts->registered['alpinejs'])) {
+                    $current_deps = $wp_scripts->registered['alpinejs']->deps;
+                    if (!in_array('doc-search-alpine-list', $current_deps)) {
+                        $wp_scripts->registered['alpinejs']->deps[] = 'doc-search-alpine-list';
+                    }
+                }
+                wp_enqueue_script('alpinejs');
+            }
         }
         wp_enqueue_style('doc-search-frontend');
 

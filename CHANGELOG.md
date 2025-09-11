@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.9(beta)] - 2025-09-11
+
+### Changed
+- Alpine.js now served locally from `assets/vendor/alpine.min.js` instead of unpkg CDN
+- Improved script loading dependencies to ensure component scripts load before Alpine.js initialization
+- Enhanced multiple shortcode support on same page with proper dependency management
+
+### Fixed
+- "Alpine Expression Error: docSearchList is not defined" when using both search and list shortcodes on same page
+- Script loading order issues with local Alpine.js file resolved through dynamic dependency injection
+
+### Technical
+- Downloaded Alpine.js v3.15.0 (44KB) to local vendor directory
+- Modified Shortcode.php to add component scripts as dependencies to Alpine.js dynamically
+- Removed `defer` attribute from component scripts to ensure immediate execution
+- CodeMirror remains on CDN (esm.sh) for advanced CSS editor functionality
+
 ## [1.0.8(beta)] - 2025-09-10
 
 ### Fixed

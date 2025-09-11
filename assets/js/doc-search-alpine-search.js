@@ -388,10 +388,17 @@
   });
 
   // Make it available both ways:
-  window.docSearchSearch = docSearchSearchFactory; // direct global for x-data="ddSearch(...)"
+  window.docSearchSearch = docSearchSearchFactory; // direct global for x-data="docSearchSearch(...)"
+  
+  // Register with Alpine.js only once to prevent conflicts with multiple instances
+  if (!window._docSearchRegistered) {
+    window._docSearchRegistered = {};
+  }
+  
   document.addEventListener('alpine:init', () => {
-    if (window.Alpine && typeof window.Alpine.data === 'function') {
+    if (window.Alpine && typeof window.Alpine.data === 'function' && !window._docSearchRegistered.search) {
       window.Alpine.data('docSearchSearch', docSearchSearchFactory);
+      window._docSearchRegistered.search = true;
     }
   });
 })();

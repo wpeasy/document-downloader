@@ -385,11 +385,31 @@
       const targetId = paginationEl.getAttribute('data-pagination-target');
       const targetEl = document.getElementById(targetId);
       
-      if (!targetEl || !targetEl._x_dataStack) return;
+      if (!targetEl) return;
       
-      // Get the Alpine component data
-      const component = targetEl._x_dataStack[0];
-      if (!component || !component.pagination) return;
+      // Wait for Alpine to initialize on this element if needed
+      if (!targetEl._x_dataStack) {
+        // Try again later if Alpine hasn't initialized yet
+        setTimeout(() => {
+          if (targetEl._x_dataStack) {
+            linkSinglePagination(paginationEl, targetEl);
+          }
+        }, 500);
+        return;
+      }
+      
+      linkSinglePagination(paginationEl, targetEl);
+    });
+  }
+  
+  function linkSinglePagination(paginationEl, targetEl) {
+    // Get the Alpine component data
+    const component = targetEl._x_dataStack?.[0];
+    if (!component || !component.pagination) return;
+    
+    // Skip if this pagination element is already linked
+    if (paginationEl._linkedToPagination) return;
+    paginationEl._linkedToPagination = true;
       
       // Create pagination HTML based on component state
       const updatePaginationHTML = () => {
@@ -461,12 +481,16 @@
       
       // Initial render
       setTimeout(updatePaginationHTML, 100);
-    });
   }
   
   // Initialize external pagination when Alpine is ready
   document.addEventListener('alpine:initialized', () => {
     linkExternalPagination();
+  });
+  
+  // Additional initialization after DOM content loaded
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(linkExternalPagination, 500);
   });
   
   // Fallback for when Alpine isn't available
@@ -475,10 +499,17 @@
   }, 1000);
 
   // Make it available both ways:
-  window.docSearchList = docSearchListFactory; // direct global for x-data="ddList(...)"
+  window.docSearchList = docSearchListFactory; // direct global for x-data="docSearchList(...)"
+  
+  // Register with Alpine.js only once to prevent conflicts with multiple instances
+  if (!window._docSearchRegistered) {
+    window._docSearchRegistered = {};
+  }
+  
   document.addEventListener('alpine:init', () => {
-    if (window.Alpine && typeof window.Alpine.data === 'function') {
+    if (window.Alpine && typeof window.Alpine.data === 'function' && !window._docSearchRegistered.list) {
       window.Alpine.data('docSearchList', docSearchListFactory);
+      window._docSearchRegistered.list = true;
     }
   });
 })();

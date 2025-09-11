@@ -9,7 +9,10 @@
       "Bash(git push:*)",
       "Bash(zip:*)",
       "Bash(powershell:*)",
-      "Read(//c/Users/Alan.Blair/.claude/commands/**)"
+      "Read(//c/Users/Alan.Blair/.claude/commands/**)",
+      "Bash(php:*)",
+      "Bash(node:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []
