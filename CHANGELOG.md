@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.3(beta)] - 2025-10-04
+
+### Fixed
+- WordPress 2025 theme compatibility issue where wptexturize() corrupted Alpine.js attributes
+- Direct wptexturize() calls in template-part.php and block-template.php now bypassed
+
+### Changed
+- Shortcode output now wrapped in `<script type="text/template">` tags to prevent wptexturize processing
+- Alpine.js HTML is injected via JavaScript after page load to preserve attributes
+- Replaced base64 encoding approach with cleaner script template method
+
+### Technical
+- Investigation revealed WP 2025 theme uses pattern blocks that call wptexturize() directly without run_wptexturize filter
+- The no_texturize_shortcodes filter only protects content between shortcode tags, not shortcode output
+- Script templates are excluded from wptexturize processing per WordPress core behavior
+- Method works across all block themes including Twenty Twenty-Four and Twenty Twenty-Five
+
 ## [1.1.2(beta)] - 2025-10-03
 
 ### Fixed

@@ -170,3 +170,49 @@ $zip.Dispose()
 ```
 
 This ensures the ZIP extracts to a single `document-downloader/` folder suitable for WordPress plugin installation.
+
+## WordPress Theme Compatibility - wptexturize Issue
+
+### Problem
+WordPress block themes (especially Twenty Twenty-Five) apply `wptexturize()` to content, which converts straight quotes to curly quotes and breaks Alpine.js attributes in shortcode output.
+
+### Root Cause
+1. **Classic themes**: Apply `the_content` filter with wptexturize at priority 10, before do_shortcode at priority 11. Works fine.
+2. **Block themes (2024)**: Use `<!-- wp:post-content /-->` which calls wptexturize through filters. Generally works.
+3. **Block themes (2025)**: Use pattern blocks (`<!-- wp:pattern /-->`) that trigger `template-part.php` which calls `wptexturize()` **DIRECTLY** without filters.
+
+The direct call in `wp-includes/blocks/template-part.php:158` bypasses:
+- `run_wptexturize` filter
+- `no_texturize_shortcodes` filter
+
+### Solution
+Wrap shortcode output in `<script type="text/template">` tags:
+
+```php
+return '<div id="doc-search-container-' . esc_attr($unique_id) . '"></div>
+<script type="text/template" id="doc-search-template-' . esc_attr($unique_id) . '">
+' . $html . '
+</script>
+<script>
+(function() {
+    var container = document.getElementById("doc-search-container-' . esc_js($unique_id) . '");
+    var template = document.getElementById("doc-search-template-' . esc_js($unique_id) . '");
+    if (container && template) {
+        container.innerHTML = template.innerHTML;
+        template.remove();
+    }
+})();
+</script>';
+```
+
+**Why it works**: WordPress `wptexturize()` skips content inside `<script>` tags (see wp-includes/formatting.php). JavaScript moves the HTML from template to container after page load.
+
+**Applied to**:
+- `Shortcode::render_search()` (src/Shortcode.php:354-367)
+- Should be applied to `render_list()` if same issue occurs
+
+### Alternative Approaches Tested
+- ❌ `run_wptexturize` filter - Not called when wptexturize() is invoked directly
+- ❌ `no_texturize_shortcodes` filter - Only protects content BETWEEN shortcode tags, not output
+- ❌ Base64 encoding - Works but adds complexity and requires ASCII-only content
+- ✅ Script template wrapper - Clean, reliable, works across all themes

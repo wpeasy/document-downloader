@@ -129,6 +129,31 @@ final class Instructions
                     <li><strong><?php esc_html_e('Download Requirements:', 'document-downloader'); ?></strong> <?php esc_html_e('Require email, name, or phone before downloads', 'document-downloader'); ?></li>
                     <li><strong><?php esc_html_e('Search Exclusions:', 'document-downloader'); ?></strong> <?php esc_html_e('Words or phrases to exclude from search results', 'document-downloader'); ?></li>
                 </ul>
+
+                <h3><?php esc_html_e('Search Customization', 'document-downloader'); ?></h3>
+                <p><?php esc_html_e('Customize search behavior in settings:', 'document-downloader'); ?></p>
+                <ul>
+                    <li><strong><?php esc_html_e('Search Title:', 'document-downloader'); ?></strong> <?php esc_html_e('Custom title for the search interface', 'document-downloader'); ?></li>
+                    <li><strong><?php esc_html_e('Minimum Characters:', 'document-downloader'); ?></strong> <?php esc_html_e('Number of characters needed to trigger search (1-10, default: 3)', 'document-downloader'); ?></li>
+                    <li><strong><?php esc_html_e('Placeholder Text:', 'document-downloader'); ?></strong> <?php esc_html_e('Custom placeholder for the search input field', 'document-downloader'); ?></li>
+                </ul>
+
+                <h3><?php esc_html_e('Search Match Modes', 'document-downloader'); ?></h3>
+                <p><?php esc_html_e('Choose how search queries match document titles:', 'document-downloader'); ?></p>
+                <ul>
+                    <li><strong><?php esc_html_e('Any Partial Match (default):', 'document-downloader'); ?></strong> <?php esc_html_e('All search words must appear anywhere in title. Example: "beach" matches "Broadbeach"', 'document-downloader'); ?></li>
+                    <li><strong><?php esc_html_e('Exact Match:', 'document-downloader'); ?></strong> <?php esc_html_e('Title must exactly match search query (case-insensitive)', 'document-downloader'); ?></li>
+                    <li><strong><?php esc_html_e('Whole Word Match:', 'document-downloader'); ?></strong> <?php esc_html_e('All search words must match complete words in title. Example: "beach" will NOT match "Broadbeach"', 'document-downloader'); ?></li>
+                    <li><strong><?php esc_html_e('Custom Callback:', 'document-downloader'); ?></strong> <?php esc_html_e('Use your own PHP function to filter results. Function must accept ($post_title, $search_query) and return true/false', 'document-downloader'); ?></li>
+                </ul>
+                <p class="description"><strong><?php esc_html_e('Example Custom Callback:', 'document-downloader'); ?></strong></p>
+                <pre style="background: #f0f0f0; padding: 10px; border-radius: 4px;">
+// Add to your theme's functions.php
+function my_custom_search_filter($title, $query) {
+    // Custom logic here
+    return stripos($title, $query) !== false;
+}
+                </pre>
                 
                 <h3><?php esc_html_e('Email Notifications', 'document-downloader'); ?></h3>
                 <p><?php esc_html_e('Configure download notifications in the', 'document-downloader'); ?> <strong><?php esc_html_e('Notifications tab', 'document-downloader'); ?></strong> <?php esc_html_e('of settings:', 'document-downloader'); ?></p>

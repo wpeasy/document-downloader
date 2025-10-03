@@ -12,7 +12,15 @@
       "Read(//c/Users/Alan.Blair/.claude/commands/**)",
       "Bash(php:*)",
       "Bash(node:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "SlashCommand(/zip-plugin)",
+      "Bash(unzip:*)",
+      "Read(//c/Users/Alan.Blair/Local Sites/bricks-playground/app/public/wp-content/themes/**)",
+      "Read(//c/Users/Alan.Blair/Local Sites/bricks-playground/app/public/wp-includes/**)",
+      "Read(//c/Users/Alan.Blair/Local Sites/bricks-playground/app/public/**)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

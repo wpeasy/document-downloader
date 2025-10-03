@@ -12,11 +12,17 @@ final class Shortcode
         add_shortcode('wpe_document_pagination', [__CLASS__, 'render_pagination']);
         add_action('wp_enqueue_scripts', [__CLASS__, 'assets']);
 
-        // Prevent wptexturize from breaking Alpine.js expressions
-        add_filter('no_texturize_shortcodes', [__CLASS__, 'disable_wptexturize']);
+        // Prevent wptexturize from processing our shortcodes
+        add_filter('no_texturize_shortcodes', [__CLASS__, 'exclude_shortcodes_from_wptexturize']);
     }
 
-    public static function disable_wptexturize($shortcodes): array
+    /**
+     * Exclude our shortcodes from wptexturize processing
+     *
+     * @param array $shortcodes Array of shortcode tags to exclude
+     * @return array Modified array with our shortcodes added
+     */
+    public static function exclude_shortcodes_from_wptexturize($shortcodes): array
     {
         $shortcodes[] = 'wpe_document_search';
         $shortcodes[] = 'wpe_document_list';
@@ -343,15 +349,19 @@ final class Shortcode
 <?php
         $html = ob_get_clean();
 
-        // Encode the entire output to bypass wptexturize, then decode with JavaScript
-        $encoded = base64_encode($html);
-
-        return '<div id="doc-search-wrapper-' . esc_attr($unique_id) . '"></div>
+        // Wrap in script template to bypass wptexturize, then inject with JavaScript
+        // This is necessary because WP 2025 theme uses patterns that call wptexturize() directly
+        return '<div id="doc-search-container-' . esc_attr($unique_id) . '"></div>
+<script type="text/template" id="doc-search-template-' . esc_attr($unique_id) . '">
+' . $html . '
+</script>
 <script>
 (function() {
-    var wrapper = document.getElementById("doc-search-wrapper-' . esc_js($unique_id) . '");
-    if (wrapper) {
-        wrapper.outerHTML = atob("' . $encoded . '");
+    var container = document.getElementById("doc-search-container-' . esc_js($unique_id) . '");
+    var template = document.getElementById("doc-search-template-' . esc_js($unique_id) . '");
+    if (container && template) {
+        container.innerHTML = template.innerHTML;
+        template.remove();
     }
 })();
 </script>';

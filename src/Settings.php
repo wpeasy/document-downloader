@@ -35,7 +35,8 @@ final class Settings
             'search_title'        => '',
             'search_min_chars'    => 3,
             'search_placeholder'  => '',
-            'search_exact_match'  => 0,
+            'search_match_mode'   => 'partial',
+            'search_custom_callback' => '',
             'frontend_css'        => self::default_css(),
         ];
     }
@@ -313,7 +314,8 @@ CSS;
             'search_title'        => trim((string)$opt['search_title']),
             'search_min_chars'    => max(1, min(10, (int)$opt['search_min_chars'])),
             'search_placeholder'  => trim((string)$opt['search_placeholder']),
-            'search_exact_match'  => (int)!empty($opt['search_exact_match']),
+            'search_match_mode'   => in_array($opt['search_match_mode'], ['partial', 'exact', 'whole_word', 'custom']) ? $opt['search_match_mode'] : 'partial',
+            'search_custom_callback' => trim((string)$opt['search_custom_callback']),
             'frontend_css'        => (string)$opt['frontend_css'],
         ];
         if ($out['plural'] === '')   $out['plural']   = 'Documents';
@@ -379,7 +381,8 @@ CSS;
             'search_title'        => isset($value['search_title']) ? sanitize_text_field($value['search_title']) : $d['search_title'],
             'search_min_chars'    => isset($value['search_min_chars']) ? max(1, intval($value['search_min_chars'])) : $d['search_min_chars'],
             'search_placeholder'  => isset($value['search_placeholder']) ? sanitize_text_field($value['search_placeholder']) : $d['search_placeholder'],
-            'search_exact_match'  => !empty($value['search_exact_match']) ? 1 : 0,
+            'search_match_mode'   => isset($value['search_match_mode']) && in_array($value['search_match_mode'], ['partial', 'exact', 'whole_word', 'custom']) ? $value['search_match_mode'] : $d['search_match_mode'],
+            'search_custom_callback' => isset($value['search_custom_callback']) ? sanitize_text_field($value['search_custom_callback']) : $d['search_custom_callback'],
             'frontend_css'        => isset($value['frontend_css']) ? preg_replace("/^\xEF\xBB\xBF/", '', (string)$value['frontend_css']) : $d['frontend_css'],
         ];
         if ($out['plural'] === '')   $out['plural']   = $d['plural'];
@@ -515,8 +518,44 @@ CSS;
                                     </td>
                                 </tr>
                                 <tr>
-                                    <th scope="row"><?php esc_html_e('Exact Match Search', 'document-downloader'); ?></th>
-                                    <td><?php self::field_checkbox('search_exact_match', (int)($opt['search_exact_match'] ?? 0), __('Only return results that exactly match the search query (case-insensitive). Unchecked allows partial matches.', 'document-downloader')); ?></td>
+                                    <th scope="row"><?php esc_html_e('Search Match Mode', 'document-downloader'); ?></th>
+                                    <td>
+                                        <fieldset>
+                                            <legend class="screen-reader-text"><span><?php esc_html_e('Search Match Mode', 'document-downloader'); ?></span></legend>
+                                            <label>
+                                                <input type="radio" name="<?php echo esc_attr(self::OPTION); ?>[search_match_mode]" value="partial" <?php checked($opt['search_match_mode'] ?? 'partial', 'partial'); ?> />
+                                                <?php esc_html_e('Any Partial Match (default)', 'document-downloader'); ?>
+                                            </label><br>
+                                            <label>
+                                                <input type="radio" name="<?php echo esc_attr(self::OPTION); ?>[search_match_mode]" value="exact" <?php checked($opt['search_match_mode'] ?? 'partial', 'exact'); ?> />
+                                                <?php esc_html_e('Exact Match', 'document-downloader'); ?>
+                                            </label><br>
+                                            <label>
+                                                <input type="radio" name="<?php echo esc_attr(self::OPTION); ?>[search_match_mode]" value="whole_word" <?php checked($opt['search_match_mode'] ?? 'partial', 'whole_word'); ?> />
+                                                <?php esc_html_e('Whole Word Match', 'document-downloader'); ?>
+                                            </label><br>
+                                            <label>
+                                                <input type="radio" name="<?php echo esc_attr(self::OPTION); ?>[search_match_mode]" value="custom" <?php checked($opt['search_match_mode'] ?? 'partial', 'custom'); ?> />
+                                                <?php esc_html_e('Custom Callback', 'document-downloader'); ?>
+                                            </label>
+                                            <p class="description">
+                                                <?php esc_html_e('Any Partial Match: All search words must appear anywhere in title (e.g., "beach" matches "Broadbeach")', 'document-downloader'); ?><br>
+                                                <?php esc_html_e('Exact Match: Title must exactly match search query (case-insensitive)', 'document-downloader'); ?><br>
+                                                <?php esc_html_e('Whole Word Match: All search words must match complete words in title', 'document-downloader'); ?><br>
+                                                <?php esc_html_e('Custom Callback: Use your own PHP function to filter results', 'document-downloader'); ?>
+                                            </p>
+                                        </fieldset>
+                                    </td>
+                                </tr>
+                                <tr id="search-custom-callback-row" style="<?php echo ($opt['search_match_mode'] ?? 'partial') === 'custom' ? '' : 'display:none;'; ?>">
+                                    <th scope="row"><label for="doc-search-custom-callback"><?php esc_html_e('Custom Callback Function', 'document-downloader'); ?></label></th>
+                                    <td>
+                                        <?php self::field_text('search_custom_callback', $opt['search_custom_callback'] ?? '', 'my_custom_search_filter', 'id="doc-search-custom-callback" class="regular-text"'); ?>
+                                        <p class="description">
+                                            <?php esc_html_e('Enter the name of a PHP function that accepts ($post_title, $search_query) and returns true/false.', 'document-downloader'); ?><br>
+                                            <?php esc_html_e('Example: my_custom_search_filter', 'document-downloader'); ?>
+                                        </p>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
@@ -722,7 +761,23 @@ CSS;
           const toggleScheduleVisibility = () => {
             if (scheduleRow) scheduleRow.style.display = (notifySchedule && notifySchedule.checked) ? '' : 'none';
           };
-          
+
+          // Toggle custom callback row visibility
+          const matchModeRadios = document.querySelectorAll('input[name="<?php echo esc_js(self::OPTION); ?>[search_match_mode]"]');
+          const customCallbackRow = document.getElementById('search-custom-callback-row');
+
+          const toggleCustomCallbackVisibility = () => {
+            const customRadio = document.querySelector('input[name="<?php echo esc_js(self::OPTION); ?>[search_match_mode]"][value="custom"]');
+            if (customCallbackRow && customRadio) {
+              customCallbackRow.style.display = customRadio.checked ? '' : 'none';
+            }
+          };
+
+          matchModeRadios.forEach(radio => {
+            radio.addEventListener('change', toggleCustomCallbackVisibility);
+          });
+          toggleCustomCallbackVisibility();
+
           if (notifyIndividual) {
             notifyIndividual.addEventListener('change', toggleEmailVisibility);
           }

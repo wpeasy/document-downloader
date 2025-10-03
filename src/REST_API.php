@@ -159,9 +159,10 @@ final class REST_API
             return new WP_REST_Response([], 200);
         }
 
-        // Check if exact match mode is enabled
+        // Get search match mode settings
         $opts = Settings::get_options();
-        $exact_match = !empty($opts['search_exact_match']);
+        $match_mode = $opts['search_match_mode'] ?? 'partial';
+        $custom_callback = $opts['search_custom_callback'] ?? '';
 
         $args = [
             'post_type'       => CPT::POST_TYPE,
@@ -175,12 +176,12 @@ final class REST_API
 
         // Only add search if query is not empty
         if ($s !== '') {
-            if (!$exact_match) {
+            if ($match_mode === 'partial') {
                 // Partial match - use WordPress search
                 $args['s'] = $s;
                 $args['search_columns'] = ['post_title'];
             }
-            // For exact match, don't use WP search - we'll filter manually after getting all posts
+            // For other modes, don't use WP search - we'll filter manually after getting all posts
         }
 
         if ($tax) {
@@ -200,29 +201,76 @@ final class REST_API
 
             // Apply filtering based on match mode
             if ($s !== '') {
-                if ($exact_match) {
-                    // Exact match: title must exactly match search query (case-insensitive)
-                    if (strcasecmp($post->post_title, $s) !== 0) {
-                        continue;
-                    }
-                } else {
-                    // Partial match: ALL words in search must be found (partial) in title
-                    $title_lower = mb_strtolower($post->post_title);
-                    $search_words = preg_split('/\s+/', mb_strtolower($s));
-                    $matches_all = true;
+                $title = $post->post_title;
+                $matches = false;
 
-                    foreach ($search_words as $word) {
-                        if (empty($word)) continue;
-                        // Check if word appears anywhere in title (partial match)
-                        if (strpos($title_lower, $word) === false) {
-                            $matches_all = false;
-                            break;
+                switch ($match_mode) {
+                    case 'exact':
+                        // Exact match: title must exactly match search query (case-insensitive)
+                        $matches = (strcasecmp($title, $s) === 0);
+                        break;
+
+                    case 'whole_word':
+                        // Whole word match: all search words must match complete words in title
+                        $title_lower = mb_strtolower($title);
+                        $search_words = preg_split('/\s+/', mb_strtolower($s));
+                        $matches = true;
+
+                        foreach ($search_words as $word) {
+                            if (empty($word)) continue;
+                            // Check if word exists as complete word (with word boundaries)
+                            if (!preg_match('/\b' . preg_quote($word, '/') . '\b/u', $title_lower)) {
+                                $matches = false;
+                                break;
+                            }
                         }
-                    }
+                        break;
 
-                    if (!$matches_all) {
-                        continue;
-                    }
+                    case 'custom':
+                        // Custom callback: use user-defined function
+                        if (!empty($custom_callback) && function_exists($custom_callback)) {
+                            try {
+                                $matches = (bool) call_user_func($custom_callback, $title, $s);
+                            } catch (\Exception $e) {
+                                // If callback throws error, skip this result
+                                $matches = false;
+                            }
+                        } else {
+                            // Callback doesn't exist, fall back to partial match
+                            $title_lower = mb_strtolower($title);
+                            $search_words = preg_split('/\s+/', mb_strtolower($s));
+                            $matches = true;
+
+                            foreach ($search_words as $word) {
+                                if (empty($word)) continue;
+                                if (strpos($title_lower, $word) === false) {
+                                    $matches = false;
+                                    break;
+                                }
+                            }
+                        }
+                        break;
+
+                    case 'partial':
+                    default:
+                        // Partial match: ALL words in search must be found (partial) in title
+                        $title_lower = mb_strtolower($title);
+                        $search_words = preg_split('/\s+/', mb_strtolower($s));
+                        $matches = true;
+
+                        foreach ($search_words as $word) {
+                            if (empty($word)) continue;
+                            // Check if word appears anywhere in title (partial match)
+                            if (strpos($title_lower, $word) === false) {
+                                $matches = false;
+                                break;
+                            }
+                        }
+                        break;
+                }
+
+                if (!$matches) {
+                    continue;
                 }
             }
 
