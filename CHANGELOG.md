@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1(beta)] - 2025-10-03
+
+### Fixed
+- All Unicode characters replaced with HTML entities or ASCII equivalents to prevent base64 encoding corruption
+- Ellipsis (...) characters now use three periods instead of Unicode …
+- Arrow symbols (→) replaced with &gt; HTML entity in Instructions page
+- Warning symbol (⚠️) replaced with &#9888; HTML entity in Settings page
+- "Searching...", "Working...", "Loading documents...", "Filter documents..." text now displays correctly
+
+### Changed
+- ZIP creation now includes vendor directory with composer autoload files for proper plugin functionality
+
 ## [1.1.0(beta)] - 2025-10-03
 
 ### Added

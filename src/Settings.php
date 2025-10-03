@@ -583,7 +583,7 @@ CSS;
                                     <p style="margin: 0 0 3px 0; color: #0073aa;"><span class="doc-search-placeholder" data-placeholder="{?email!name:<strong>Email:</strong> {email}<br><br>}">{?email!name:&lt;strong&gt;Email:&lt;/strong&gt; {email}&lt;br&gt;&lt;br&gt;}</span></p>
                                     <p style="margin: 0 0 8px 0; color: #666; font-size: 11px;"><?php esc_html_e('Click examples above to copy to clipboard', 'document-downloader'); ?></p>
                                     <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 8px; border-radius: 3px; margin-top: 10px;">
-                                        <p style="margin: 0; color: #856404; font-size: 11px; font-weight: bold;">⚠️ <?php esc_html_e('Important:', 'document-downloader'); ?></p>
+                                        <p style="margin: 0; color: #856404; font-size: 11px; font-weight: bold;">&#9888; <?php esc_html_e('Important:', 'document-downloader'); ?></p>
                                         <p style="margin: 2px 0 0 0; color: #856404; font-size: 11px;"><?php esc_html_e('If using conditional placeholders, stay in Text mode. Switching to Visual mode will break the conditional syntax.', 'document-downloader'); ?></p>
                                     </div>
                                 </div>

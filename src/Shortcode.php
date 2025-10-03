@@ -257,7 +257,7 @@ final class Shortcode
     </template>
 
     <template x-if="loading">
-      <p class="doc-search__status doc-search__status--loading"><?php esc_html_e('Searching…', 'document-downloader'); ?></p>
+      <p class="doc-search__status doc-search__status--loading"><?php esc_html_e('Searching...', 'document-downloader'); ?></p>
     </template>
 
     <template x-if="error">
@@ -333,7 +333,7 @@ final class Shortcode
       <div class="doc-search__actions">
         <button type="submit" class="doc-search__btn doc-search__btn--primary" :disabled="!formValid || downloading">
           <span x-show="!downloading"><?php esc_html_e('Download', 'document-downloader'); ?></span>
-          <span x-show="downloading"><?php esc_html_e('Working…', 'document-downloader'); ?></span>
+          <span x-show="downloading"><?php esc_html_e('Working...', 'document-downloader'); ?></span>
         </button>
         <button type="button" class="doc-search__btn" @click="$refs.dlg.close()"><?php esc_html_e('Cancel', 'document-downloader'); ?></button>
       </div>
@@ -433,7 +433,7 @@ final class Shortcode
       id="doc-search-list-input"
       class="doc-search__input"
       type="search"
-      placeholder="<?php esc_attr_e('Filter documents…', 'document-downloader'); ?>"
+      placeholder="<?php esc_attr_e('Filter documents...', 'document-downloader'); ?>"
       x-model="query"
       @input="debouncedFilter()"
       autocomplete="off"
@@ -464,7 +464,7 @@ final class Shortcode
 
   <div class="doc-search__statuswrap" aria-live="polite" role="status">
     <template x-if="loading">
-      <p class="doc-search__status doc-search__status--loading"><?php esc_html_e('Loading documents…', 'document-downloader'); ?></p>
+      <p class="doc-search__status doc-search__status--loading"><?php esc_html_e('Loading documents...', 'document-downloader'); ?></p>
     </template>
 
     <template x-if="error">
@@ -544,7 +544,7 @@ final class Shortcode
       <div class="doc-search__actions">
         <button type="submit" class="doc-search__btn doc-search__btn--primary" :disabled="!formValid || downloading">
           <span x-show="!downloading"><?php esc_html_e('Download', 'document-downloader'); ?></span>
-          <span x-show="downloading"><?php esc_html_e('Working…', 'document-downloader'); ?></span>
+          <span x-show="downloading"><?php esc_html_e('Working...', 'document-downloader'); ?></span>
         </button>
         <button type="button" class="doc-search__btn" @click="$refs.dlg.close()"><?php esc_html_e('Cancel', 'document-downloader'); ?></button>
       </div>

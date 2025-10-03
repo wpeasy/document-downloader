@@ -55,7 +55,7 @@ final class Instructions
                 
                 <h4><?php esc_html_e('How to Find Taxonomy Slugs', 'document-downloader'); ?></h4>
                 <ol>
-                    <li><?php esc_html_e('Go to Documents → Document Types in your admin menu', 'document-downloader'); ?></li>
+                    <li><?php esc_html_e('Go to Documents &gt; Document Types in your admin menu', 'document-downloader'); ?></li>
                     <li><?php esc_html_e('Click on a document type to edit it', 'document-downloader'); ?></li>
                     <li><?php esc_html_e('Look at the "Slug" field - this is what you use in the tax parameter', 'document-downloader'); ?></li>
                     <li><?php esc_html_e('For multiple types, separate them with commas: tax="type1,type2,type3"', 'document-downloader'); ?></li>
@@ -102,7 +102,7 @@ final class Instructions
                 
                 <h3><?php esc_html_e('Adding Documents', 'document-downloader'); ?></h3>
                 <ol>
-                    <li><?php esc_html_e('Go to Documents → Add New', 'document-downloader'); ?></li>
+                    <li><?php esc_html_e('Go to Documents &gt; Add New', 'document-downloader'); ?></li>
                     <li><?php esc_html_e('Enter a title for your document', 'document-downloader'); ?></li>
                     <li><?php esc_html_e('Select a document type from the "Document Types" box', 'document-downloader'); ?></li>
                     <li><?php esc_html_e('In the "Document File" section, click "Select File" to upload your document', 'document-downloader'); ?></li>
@@ -122,7 +122,7 @@ final class Instructions
                 <h2><?php esc_html_e('Settings & Configuration', 'document-downloader'); ?></h2>
                 
                 <h3><?php esc_html_e('General Settings', 'document-downloader'); ?></h3>
-                <p><?php esc_html_e('Access settings at:', 'document-downloader'); ?> <strong><?php esc_html_e('Documents → Settings', 'document-downloader'); ?></strong></p>
+                <p><?php esc_html_e('Access settings at:', 'document-downloader'); ?> <strong><?php esc_html_e('Documents &gt; Settings', 'document-downloader'); ?></strong></p>
                 <ul>
                     <li><strong><?php esc_html_e('Post Type Labels:', 'document-downloader'); ?></strong> <?php esc_html_e('Customize how "Documents" appears in your admin menu', 'document-downloader'); ?></li>
                     <li><strong><?php esc_html_e('Alpine.js:', 'document-downloader'); ?></strong> <?php esc_html_e('Disable if your theme already includes Alpine.js', 'document-downloader'); ?></li>
@@ -150,7 +150,7 @@ final class Instructions
 
             <div class="card">
                 <h2><?php esc_html_e('Download Tracking', 'document-downloader'); ?></h2>
-                <p><?php esc_html_e('View download statistics at:', 'document-downloader'); ?> <strong><?php esc_html_e('Documents → Downloads', 'document-downloader'); ?></strong></p>
+                <p><?php esc_html_e('View download statistics at:', 'document-downloader'); ?> <strong><?php esc_html_e('Documents &gt; Downloads', 'document-downloader'); ?></strong></p>
                 <ul>
                     <li><?php esc_html_e('See who downloaded what and when', 'document-downloader'); ?></li>
                     <li><?php esc_html_e('Export download data as CSV', 'document-downloader'); ?></li>
