@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.2(beta)] - 2025-10-03
+
+### Fixed
+- Partial match search now requires ALL words in search query to be found in document title
+- Fixed issue where searching "beach z" would match "Broadbeach" even though "z" doesn't exist in the title
+- Search results now properly filtered to ensure every search word appears (partial match) in the title
+
+### Changed
+- Partial match logic improved: splits search into words and verifies each word exists somewhere in the title
+
 ## [1.1.1(beta)] - 2025-10-03
 
 ### Fixed

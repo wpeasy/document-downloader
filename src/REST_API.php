@@ -198,10 +198,31 @@ final class REST_API
         foreach ($q->posts as $post_id) {
             $post = get_post($post_id);
 
-            // Apply exact match filtering if enabled
-            if ($exact_match && $s !== '') {
-                if (strcasecmp($post->post_title, $s) !== 0) {
-                    continue; // Skip posts that don't exactly match
+            // Apply filtering based on match mode
+            if ($s !== '') {
+                if ($exact_match) {
+                    // Exact match: title must exactly match search query (case-insensitive)
+                    if (strcasecmp($post->post_title, $s) !== 0) {
+                        continue;
+                    }
+                } else {
+                    // Partial match: ALL words in search must be found (partial) in title
+                    $title_lower = mb_strtolower($post->post_title);
+                    $search_words = preg_split('/\s+/', mb_strtolower($s));
+                    $matches_all = true;
+
+                    foreach ($search_words as $word) {
+                        if (empty($word)) continue;
+                        // Check if word appears anywhere in title (partial match)
+                        if (strpos($title_lower, $word) === false) {
+                            $matches_all = false;
+                            break;
+                        }
+                    }
+
+                    if (!$matches_all) {
+                        continue;
+                    }
                 }
             }
 
