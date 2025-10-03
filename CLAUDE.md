@@ -138,5 +138,35 @@ Both shortcodes support comprehensive pagination:
 - Frontend uses modern JavaScript (ES6+) with graceful degradation
 - CSS uses modern features (Grid, Flexbox, CSS Custom Properties) with `@layer docSearch` for easy theme overrides
 - Extensive use of WordPress core functions and APIs
-- No external dependencies beyond WordPress and optional AlpineJS CDN
+- Alpine.js served locally from `assets/vendor/alpine.min.js`, CodeMirror uses CDN (esm.sh)
 - Role-based access control: Settings for administrators, other features for editors and above
+
+## ZIP Creation for WordPress Plugin Installation
+
+When using `/commit-version`, the ZIP file creation process ensures proper WordPress plugin installation:
+
+### Requirements
+- **Forward slash separators** - Essential for cross-platform compatibility and Linux extraction
+- **Plugin directory structure** - All files must be under `document-downloader/` root directory
+- **Excluded files** - Dotfiles, composer files, CHANGELOG.md, CLAUDE.md, PowerShell scripts, existing ZIPs
+
+### PowerShell Script Template
+```powershell
+# WordPress Plugin ZIP Creator with forward slash separators
+$pluginFolderName = Split-Path (Get-Location) -Leaf
+$zipPath = Join-Path (Get-Location) "$pluginFolderName.zip"
+
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+Add-Type -AssemblyName System.IO.Compression
+$zip = [System.IO.Compression.ZipFile]::Open($zipPath, 'Create')
+
+# Add files with forward slash paths: "$pluginFolderName/" + ($relativePath -replace '\\', '/')
+foreach ($file in $filesToInclude) {
+    $zipEntryName = "$pluginFolderName/" + ($relativePath -replace '\\', '/')
+    $entry = $zip.CreateEntry($zipEntryName)
+    # Stream file content to entry
+}
+$zip.Dispose()
+```
+
+This ensures the ZIP extracts to a single `document-downloader/` folder suitable for WordPress plugin installation.

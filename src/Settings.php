@@ -32,6 +32,10 @@ final class Settings
             'notification_subject' => '{file_name} downloaded',
             'notification_message' => self::default_notification_message(),
             'excluded_search_text' => '',
+            'search_title'        => '',
+            'search_min_chars'    => 3,
+            'search_placeholder'  => '',
+            'search_exact_match'  => 0,
             'frontend_css'        => self::default_css(),
         ];
     }
@@ -306,6 +310,10 @@ CSS;
             'notification_subject' => trim((string)$opt['notification_subject']),
             'notification_message' => (string)$opt['notification_message'],
             'excluded_search_text' => trim((string)$opt['excluded_search_text']),
+            'search_title'        => trim((string)$opt['search_title']),
+            'search_min_chars'    => max(1, min(10, (int)$opt['search_min_chars'])),
+            'search_placeholder'  => trim((string)$opt['search_placeholder']),
+            'search_exact_match'  => (int)!empty($opt['search_exact_match']),
             'frontend_css'        => (string)$opt['frontend_css'],
         ];
         if ($out['plural'] === '')   $out['plural']   = 'Documents';
@@ -368,6 +376,10 @@ CSS;
             'notification_subject' => isset($value['notification_subject']) ? sanitize_text_field($value['notification_subject']) : $d['notification_subject'],
             'notification_message' => isset($value['notification_message']) ? wp_kses_post($value['notification_message']) : $d['notification_message'],
             'excluded_search_text' => isset($value['excluded_search_text']) ? sanitize_textarea_field($value['excluded_search_text']) : $d['excluded_search_text'],
+            'search_title'        => isset($value['search_title']) ? sanitize_text_field($value['search_title']) : $d['search_title'],
+            'search_min_chars'    => isset($value['search_min_chars']) ? max(1, intval($value['search_min_chars'])) : $d['search_min_chars'],
+            'search_placeholder'  => isset($value['search_placeholder']) ? sanitize_text_field($value['search_placeholder']) : $d['search_placeholder'],
+            'search_exact_match'  => !empty($value['search_exact_match']) ? 1 : 0,
             'frontend_css'        => isset($value['frontend_css']) ? preg_replace("/^\xEF\xBB\xBF/", '', (string)$value['frontend_css']) : $d['frontend_css'],
         ];
         if ($out['plural'] === '')   $out['plural']   = $d['plural'];
@@ -480,6 +492,31 @@ CSS;
                                         <?php self::field_text('excluded_search_text', $opt['excluded_search_text'], 'pdf, .docx, *temp*, draft*', 'id="doc-search-excluded-text" class="large-text"'); ?>
                                         <p class="description"><?php esc_html_e('Comma-separated list of search terms to block. If someone searches for these terms, they get no results. Use * as wildcard (e.g., "pdf, .docx, *temp*, draft*"). Without wildcards, matches whole words only.', 'document-downloader'); ?></p>
                                     </td>
+                                </tr>
+                                <tr>
+                                    <th scope="row"><label for="doc-search-min-chars"><?php esc_html_e('Minimum Characters', 'document-downloader'); ?></label></th>
+                                    <td>
+                                        <input type="number" min="1" max="10" class="small-text" name="<?php echo esc_attr(self::OPTION); ?>[search_min_chars]" id="doc-search-min-chars" value="<?php echo esc_attr($opt['search_min_chars'] ?? 3); ?>" />
+                                        <p class="description"><?php esc_html_e('Minimum number of characters required before search is triggered (default: 3).', 'document-downloader'); ?></p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th scope="row"><label for="doc-search-title"><?php esc_html_e('Search Title', 'document-downloader'); ?></label></th>
+                                    <td>
+                                        <?php self::field_text('search_title', $opt['search_title'] ?? '', '', 'id="doc-search-title" class="regular-text"'); ?>
+                                        <p class="description"><?php esc_html_e('Optional custom title for the search shortcode. If empty, uses "Search {plural_name}".', 'document-downloader'); ?></p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th scope="row"><label for="doc-search-placeholder"><?php esc_html_e('Search Placeholder Text', 'document-downloader'); ?></label></th>
+                                    <td>
+                                        <?php self::field_text('search_placeholder', $opt['search_placeholder'] ?? '', '', 'id="doc-search-placeholder" class="regular-text"'); ?>
+                                        <p class="description"><?php esc_html_e('Optional custom placeholder text for the search input. If empty, uses "Type at least X characters...".', 'document-downloader'); ?></p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th scope="row"><?php esc_html_e('Exact Match Search', 'document-downloader'); ?></th>
+                                    <td><?php self::field_checkbox('search_exact_match', (int)($opt['search_exact_match'] ?? 0), __('Only return results that exactly match the search query (case-insensitive). Unchecked allows partial matches.', 'document-downloader')); ?></td>
                                 </tr>
                             </tbody>
                         </table>

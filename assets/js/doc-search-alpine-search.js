@@ -7,6 +7,7 @@
   const docSearchSearchFactory = (endpoint) => ({
     endpoint,
     tax: [],
+    minChars: 3, // Default, will be overridden from data attribute
 
     query: '',
     results: [],
@@ -58,6 +59,12 @@
         this.tax = [];
       }
 
+      // Read minimum characters setting
+      const minCharsAttr = el?.dataset?.docSearchMinChars;
+      if (minCharsAttr) {
+        this.minChars = Math.max(1, parseInt(minCharsAttr) || 3);
+      }
+
       // Initialize pagination from data attribute
       try {
         const paginationRaw = el?.dataset?.docSearchPagination ?? '{}';
@@ -81,12 +88,12 @@
     async search() {
       const q = this.query.trim();
 
-      if (q.length < 3) {
+      if (q.length < this.minChars) {
         this.results = [];
         this.currentPageResults = [];
         this.loading = false;
         this.error = false;
-        
+
         // Reset pagination when clearing search
         this.pagination.totalPages = 0;
         this.pagination.totalItems = 0;

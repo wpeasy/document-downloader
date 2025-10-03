@@ -159,6 +159,10 @@ final class REST_API
             return new WP_REST_Response([], 200);
         }
 
+        // Check if exact match mode is enabled
+        $opts = Settings::get_options();
+        $exact_match = !empty($opts['search_exact_match']);
+
         $args = [
             'post_type'       => CPT::POST_TYPE,
             'post_status'     => 'publish',
@@ -171,8 +175,12 @@ final class REST_API
 
         // Only add search if query is not empty
         if ($s !== '') {
-            $args['s'] = $s;
-            $args['search_columns'] = ['post_title'];
+            if (!$exact_match) {
+                // Partial match - use WordPress search
+                $args['s'] = $s;
+                $args['search_columns'] = ['post_title'];
+            }
+            // For exact match, don't use WP search - we'll filter manually after getting all posts
         }
 
         if ($tax) {
@@ -188,6 +196,15 @@ final class REST_API
         $items = [];
 
         foreach ($q->posts as $post_id) {
+            $post = get_post($post_id);
+
+            // Apply exact match filtering if enabled
+            if ($exact_match && $s !== '') {
+                if (strcasecmp($post->post_title, $s) !== 0) {
+                    continue; // Skip posts that don't exactly match
+                }
+            }
+
             $att_id = (int) get_post_meta($post_id, DD_META_KEY, true);
             if (!$att_id) continue;
 

@@ -11,35 +11,46 @@ final class Shortcode
         add_shortcode('wpe_document_list', [__CLASS__, 'render_list']);
         add_shortcode('wpe_document_pagination', [__CLASS__, 'render_pagination']);
         add_action('wp_enqueue_scripts', [__CLASS__, 'assets']);
+
+        // Prevent wptexturize from breaking Alpine.js expressions
+        add_filter('no_texturize_shortcodes', [__CLASS__, 'disable_wptexturize']);
+    }
+
+    public static function disable_wptexturize($shortcodes): array
+    {
+        $shortcodes[] = 'wpe_document_search';
+        $shortcodes[] = 'wpe_document_list';
+        $shortcodes[] = 'wpe_document_pagination';
+        return $shortcodes;
     }
 
     public static function assets(): void
     {
-        // Component JS - load in head without defer to ensure they're available before Alpine
+        // Component JS - load with defer in footer
         wp_register_script(
             'doc-search-alpine-search',
             DD_PLUGIN_URL . 'assets/js/doc-search-alpine-search.js',
             [],
-            '2.0.3',
-            false
+            '2.0.5',
+            true
         );
 
         wp_register_script(
             'doc-search-alpine-list',
             DD_PLUGIN_URL . 'assets/js/doc-search-alpine-list.js',
             [],
-            '2.0.3',
-            false
+            '2.0.5',
+            true
         );
 
-        // Alpine (optional)
+        // Alpine (optional) - load in footer with both components as dependencies
         if (! wp_script_is('alpine', 'registered') && ! wp_script_is('alpinejs', 'registered')) {
             wp_register_script(
                 'alpinejs',
                 DD_PLUGIN_URL . 'assets/vendor/alpine.min.js',
-                [],
+                ['doc-search-alpine-search', 'doc-search-alpine-list'],
                 '3.15.0',
-                false
+                true
             );
             if (function_exists('wp_script_add_data')) {
                 wp_script_add_data('alpinejs', 'defer', true);
@@ -141,26 +152,21 @@ final class Shortcode
         wp_enqueue_script('doc-search-alpine-search');
         $opts = Settings::get_options();
         if (empty($opts['disable_alpine'])) {
-            if (wp_script_is('alpine', 'registered')) {
-                wp_enqueue_script('alpine');
-            } else {
-                // Add dependency to ensure component loads before Alpine
-                global $wp_scripts;
-                if (isset($wp_scripts->registered['alpinejs'])) {
-                    $current_deps = $wp_scripts->registered['alpinejs']->deps;
-                    if (!in_array('doc-search-alpine-search', $current_deps)) {
-                        $wp_scripts->registered['alpinejs']->deps[] = 'doc-search-alpine-search';
-                    }
-                }
-                wp_enqueue_script('alpinejs');
-            }
+            if (wp_script_is('alpine', 'registered')) wp_enqueue_script('alpine');
+            else wp_enqueue_script('alpinejs');
         }
         wp_enqueue_style('doc-search-frontend');
 
         $endpoint  = esc_url_raw(rest_url('document-downloader/v1/query'));
+        $opts      = Settings::get_options();
         $labels    = Settings::get_labels();
         $plural    = $labels['plural'] ?? 'Documents';
         $plural_lc = function_exists('mb_strtolower') ? mb_strtolower($plural) : strtolower($plural);
+
+        // Get custom settings with fallbacks
+        $search_title = !empty($opts['search_title']) ? $opts['search_title'] : sprintf(__('Search %s', 'document-downloader'), $plural_lc);
+        $min_chars = max(1, intval($opts['search_min_chars'] ?? 3));
+        $placeholder = !empty($opts['search_placeholder']) ? $opts['search_placeholder'] : sprintf(__('Type at least %d characters...', 'document-downloader'), $min_chars);
 
         // Shortcode attributes with defaults
         $atts = shortcode_atts([
@@ -203,9 +209,10 @@ final class Shortcode
   x-init="initFromData($el)"
   data-doc-search-tax="<?php echo $tax_json_attr; ?>"
   data-doc-search-pagination="<?php echo $pagination_config; ?>"
+  data-doc-search-min-chars="<?php echo esc_attr($min_chars); ?>"
 >
   <label class="doc-search__label" for="doc-search-search-input">
-    <?php echo esc_html( sprintf( __('Search %s', 'document-downloader'), $plural_lc ) ); ?>
+    <?php echo esc_html($search_title); ?>
   </label>
 
   <div class="doc-search__input-wrapper">
@@ -213,7 +220,7 @@ final class Shortcode
       id="doc-search-search-input"
       class="doc-search__input"
       type="search"
-      placeholder="<?php esc_attr_e('Type at least 3 characters…', 'document-downloader'); ?>"
+      placeholder="<?php echo esc_attr($placeholder); ?>"
       x-model="query"
       @input="debouncedSearch()"
       autocomplete="off"
@@ -230,12 +237,12 @@ final class Shortcode
     </div>
     
     <!-- Clear icon -->
-    <button 
-      type="button" 
-      class="doc-search__input-icon doc-search__input-icon--clear" 
-      x-show="query.length > 0 && !loading" 
+    <button
+      type="button"
+      class="doc-search__input-icon doc-search__input-icon--clear"
+      x-show="query.length > 0 && !loading"
       @click="query = ''; search();"
-      :aria-label="'<?php esc_attr_e('Clear search', 'document-downloader'); ?>'"
+      aria-label="<?php echo esc_attr(__('Clear search', 'document-downloader')); ?>"
       x-cloak
     >
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -245,8 +252,8 @@ final class Shortcode
   </div>
 
   <div class="doc-search__statuswrap" aria-live="polite" role="status">
-    <template x-if="query.length > 0 && query.length < 3">
-      <p class="doc-search__status doc-search__status--hint"><?php esc_html_e('Please type at least 3 characters.', 'document-downloader'); ?></p>
+    <template x-if="query.length > 0 && query.length < minChars">
+      <p class="doc-search__status doc-search__status--hint"><?php echo esc_html(sprintf(__('Please type at least %d characters.', 'document-downloader'), $min_chars)); ?></p>
     </template>
 
     <template x-if="loading">
@@ -257,7 +264,7 @@ final class Shortcode
       <p class="doc-search__status doc-search__status--error"><?php esc_html_e('Error: check internet connection', 'document-downloader'); ?></p>
     </template>
 
-    <template x-if="!loading && !error && results.length === 0 && query.length >= 3">
+    <template x-if="!loading && !error && results.length === 0 && query.length >= minChars">
       <p class="doc-search__status doc-search__status--empty"><?php esc_html_e('No matching documents.', 'document-downloader'); ?></p>
     </template>
   </div>
@@ -287,7 +294,11 @@ final class Shortcode
   </div>
 
   <dialog x-ref="dlg" class="doc-search__dialog" @click.self="$refs.dlg.close()">
-    <button type="button" class="doc-search__dialog-close" @click="$refs.dlg.close()" aria-label="<?php esc_attr_e('Close', 'document-downloader'); ?>">✕</button>
+    <button type="button" class="doc-search__dialog-close" @click="$refs.dlg.close()" aria-label="<?php esc_attr_e('Close', 'document-downloader'); ?>">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M18 6L6 18M6 6l12 12"/>
+      </svg>
+    </button>
     <form method="dialog" class="doc-search__dialog-form" @submit.prevent="submitEmailAndDownload()">
       <h3 class="doc-search__dialog-title"><?php esc_html_e('Enter your details to download', 'document-downloader'); ?></h3>
       <p class="doc-search__dialog-file" x-text="pendingFileName"></p>
@@ -330,7 +341,20 @@ final class Shortcode
   </dialog>
 </div>
 <?php
-        return ob_get_clean();
+        $html = ob_get_clean();
+
+        // Encode the entire output to bypass wptexturize, then decode with JavaScript
+        $encoded = base64_encode($html);
+
+        return '<div id="doc-search-wrapper-' . esc_attr($unique_id) . '"></div>
+<script>
+(function() {
+    var wrapper = document.getElementById("doc-search-wrapper-' . esc_js($unique_id) . '");
+    if (wrapper) {
+        wrapper.outerHTML = atob("' . $encoded . '");
+    }
+})();
+</script>';
     }
 
     public static function render_list($atts = [], $content = ''): string
@@ -339,19 +363,8 @@ final class Shortcode
         wp_enqueue_script('doc-search-alpine-list');
         $opts = Settings::get_options();
         if (empty($opts['disable_alpine'])) {
-            if (wp_script_is('alpine', 'registered')) {
-                wp_enqueue_script('alpine');
-            } else {
-                // Add dependency to ensure component loads before Alpine
-                global $wp_scripts;
-                if (isset($wp_scripts->registered['alpinejs'])) {
-                    $current_deps = $wp_scripts->registered['alpinejs']->deps;
-                    if (!in_array('doc-search-alpine-list', $current_deps)) {
-                        $wp_scripts->registered['alpinejs']->deps[] = 'doc-search-alpine-list';
-                    }
-                }
-                wp_enqueue_script('alpinejs');
-            }
+            if (wp_script_is('alpine', 'registered')) wp_enqueue_script('alpine');
+            else wp_enqueue_script('alpinejs');
         }
         wp_enqueue_style('doc-search-frontend');
 
@@ -435,12 +448,12 @@ final class Shortcode
       </svg>
     </div>
 
-    <button 
+    <button
       type="button"
-      class="doc-search__input-icon doc-search__input-icon--clear" 
-      x-show="query.length > 0 && !loading" 
+      class="doc-search__input-icon doc-search__input-icon--clear"
+      x-show="query.length > 0 && !loading"
       @click="query = ''; filterDocuments();"
-      :aria-label="'<?php esc_attr_e('Clear filter', 'document-downloader'); ?>'"
+      aria-label="<?php echo esc_attr(__('Clear filter', 'document-downloader')); ?>"
       x-cloak
     >
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -492,7 +505,11 @@ final class Shortcode
   </div>
 
   <dialog x-ref="dlg" class="doc-search__dialog" @click.self="$refs.dlg.close()">
-    <button type="button" class="doc-search__dialog-close" @click="$refs.dlg.close()" aria-label="<?php esc_attr_e('Close', 'document-downloader'); ?>">✕</button>
+    <button type="button" class="doc-search__dialog-close" @click="$refs.dlg.close()" aria-label="<?php esc_attr_e('Close', 'document-downloader'); ?>">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M18 6L6 18M6 6l12 12"/>
+      </svg>
+    </button>
     <form method="dialog" class="doc-search__dialog-form" @submit.prevent="submitEmailAndDownload()">
       <h3 class="doc-search__dialog-title"><?php esc_html_e('Enter your details to download', 'document-downloader'); ?></h3>
       <p class="doc-search__dialog-file" x-text="pendingFileName"></p>
@@ -572,45 +589,45 @@ final class Shortcode
         ob_start(); ?>
 <nav class="doc-search__pagination doc-search__pagination--<?php echo esc_attr($position); ?>" x-show="pagination.enabled && pagination.showPagination && pagination.totalPages > 1 && currentPageResults.length > 0" x-cloak style="display: none;">
   <div class="doc-search__pagination-wrapper">
-    <ul class="doc-search__pagination-list" role="list" :aria-label="'<?php esc_attr_e('Document pagination', 'document-downloader'); ?> ' + (pagination.currentPage + 1) + ' <?php esc_attr_e('of', 'document-downloader'); ?> ' + pagination.totalPages">
-    
+    <ul class="doc-search__pagination-list" role="list" :aria-label="'<?php echo esc_js(__('Document pagination', 'document-downloader')); ?> ' + (pagination.currentPage + 1) + ' <?php echo esc_js(__('of', 'document-downloader')); ?> ' + pagination.totalPages">
+
     <!-- Previous button -->
     <li class="doc-search__pagination-item">
-      <button 
-        type="button" 
+      <button
+        type="button"
         class="doc-search__pagination-link doc-search__pagination-link--prev"
         @click="goToPage(pagination.currentPage - 1)"
         :disabled="pagination.currentPage === 0"
-        :aria-label="'<?php esc_attr_e('Go to previous page', 'document-downloader'); ?>'"
+        aria-label="<?php echo esc_attr(__('Go to previous page', 'document-downloader')); ?>"
       >
         <span aria-hidden="true">&laquo;</span>
         <span class="doc-search__pagination-text"><?php esc_html_e('Prev', 'document-downloader'); ?></span>
       </button>
     </li>
-    
+
     <!-- Page number buttons -->
     <template x-for="page in pagination.visiblePages" :key="page">
       <li class="doc-search__pagination-item">
-        <button 
-          type="button" 
+        <button
+          type="button"
           class="doc-search__pagination-link"
           :class="{ 'doc-search__pagination-link--current': page === pagination.currentPage + 1 }"
           @click="goToPage(page - 1)"
-          :aria-label="'<?php esc_attr_e('Go to page', 'document-downloader'); ?> ' + page"
+          :aria-label="'<?php echo esc_js(__('Go to page', 'document-downloader')); ?> ' + page"
           :aria-current="page === pagination.currentPage + 1 ? 'page' : null"
           x-text="page"
         ></button>
       </li>
     </template>
-    
+
     <!-- Next button -->
     <li class="doc-search__pagination-item">
-      <button 
-        type="button" 
+      <button
+        type="button"
         class="doc-search__pagination-link doc-search__pagination-link--next"
         @click="goToPage(pagination.currentPage + 1)"
         :disabled="pagination.currentPage === pagination.totalPages - 1"
-        :aria-label="'<?php esc_attr_e('Go to next page', 'document-downloader'); ?>'"
+        aria-label="<?php echo esc_attr(__('Go to next page', 'document-downloader')); ?>"
       >
         <span class="doc-search__pagination-text"><?php esc_html_e('Next', 'document-downloader'); ?></span>
         <span aria-hidden="true">&raquo;</span>

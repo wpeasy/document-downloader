@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0(beta)] - 2025-10-03
+
+### Added
+- Search customization settings: Title, Minimum Characters, Placeholder Text, and Exact Match toggle
+- Exact Match search mode for case-insensitive exact title matching (vs default partial matching)
+- Base64 encoding workaround for WordPress themes that apply wptexturize to shortcode output
+- SVG icons for dialog close buttons to prevent character encoding issues
+
+### Changed
+- Search minimum characters now configurable (1-10, default: 3) instead of hardcoded
+- Search title and placeholder text now customizable via settings
+- Dialog close button now uses SVG X icon instead of Unicode × character
+- Settings field order: Minimum Characters now appears before Search Title
+
+### Fixed
+- Alpine.js expression errors caused by WP 2025 theme converting straight quotes to curly quotes
+- Character encoding issues with ellipsis (…) and × symbols in base64-encoded output
+- Exact match search now correctly filters all posts instead of relying on WordPress search
+- Settings save/retrieve issue where new search settings weren't included in get_options() output array
+
+### Technical
+- Shortcode output now base64-encoded and JavaScript-decoded to bypass wptexturize filter
+- Added `no_texturize_shortcodes` filter registration (fallback, not sufficient for some themes)
+- REST API exact match mode queries all posts then filters by strcasecmp() for case-insensitive comparison
+- Settings properly integrated through defaults, sanitization, and output array methods
+
 ## [1.0.9(beta)] - 2025-09-11
 
 ### Changed
